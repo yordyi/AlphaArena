@@ -386,7 +386,7 @@ def background_push_thread():
             })
 
             # 推送持仓数据
-            raw_positions = binance_client.get_positions()
+            raw_positions = binance_client.get_futures_positions()
             positions_list = []
 
             for pos in raw_positions:

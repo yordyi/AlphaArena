@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { StatCard } from '@/components/StatCard'
 import { PerformanceChart } from '@/components/PerformanceChart'
 import { PositionsTable } from '@/components/PositionsTable'
@@ -14,14 +15,38 @@ export default function Home() {
   const { data: positions, lastUpdate: posUpdate } = usePositionsWS()
   const { data: decisions, lastUpdate: decUpdate } = useDecisionsWS()
 
-  // 模拟图表数据 - 暂时使用,后续从performance.equity_curve获取
-  const mockChartData = Array.from({ length: 20 }, (_, i) => ({
-    time: new Date(Date.now() - (19 - i) * 3600000).toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }),
-    value: performance ? performance.account_value * (0.95 + i * 0.003) : 10000,
-  }))
+  // 图表数据状态
+  const [chartData, setChartData] = useState<Array<{time: string; value: number}>>([])
+
+  // 获取真实图表数据
+  useEffect(() => {
+    const fetchChartData = async () => {
+      try {
+        const response = await fetch('/api/chart')
+        const result = await response.json()
+        if (result.success && result.data) {
+          // 转换数据格式：取最近100个点
+          const formattedData = result.data.slice(-100).map((item: any) => ({
+            time: new Date(item.time).toLocaleTimeString('zh-CN', {
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            value: item.value
+          }))
+          setChartData(formattedData)
+        }
+      } catch (error) {
+        console.error('Failed to fetch chart data:', error)
+      }
+    }
+
+    fetchChartData()
+    // 每30秒刷新一次图表数据
+    const interval = setInterval(fetchChartData, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   if (perfLoading && !performance) {
     return (
@@ -126,7 +151,7 @@ export default function Home() {
         <div className="grid grid-cols-3 gap-6">
           {/* Left Column - Chart + Positions */}
           <div className="col-span-2 space-y-6">
-            <PerformanceChart data={mockChartData} />
+            <PerformanceChart data={chartData} />
             <PositionsTable positions={positions} />
           </div>
 
