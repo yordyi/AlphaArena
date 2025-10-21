@@ -4,15 +4,15 @@ import { StatCard } from '@/components/StatCard'
 import { PerformanceChart } from '@/components/PerformanceChart'
 import { PositionsTable } from '@/components/PositionsTable'
 import { AIDecisions } from '@/components/AIDecisions'
-import { usePerformance } from '@/hooks/usePerformance'
-import { usePositions } from '@/hooks/usePositions'
-import { useDecisions } from '@/hooks/useDecisions'
+import { usePerformanceWS } from '@/hooks/usePerformanceWS'
+import { usePositionsWS } from '@/hooks/usePositionsWS'
+import { useDecisionsWS } from '@/hooks/useDecisionsWS'
 
 export default function Home() {
-  // 从API获取实时数据
-  const { data: performance, loading: perfLoading, error: perfError } = usePerformance(5000)
-  const { data: positions, loading: posLoading } = usePositions(5000)
-  const { data: decisions, loading: decLoading } = useDecisions(5000)
+  // WebSocket实时数据 (<100ms延迟)
+  const { data: performance, loading: perfLoading, error: perfError, lastUpdate: perfUpdate } = usePerformanceWS()
+  const { data: positions, lastUpdate: posUpdate } = usePositionsWS()
+  const { data: decisions, lastUpdate: decUpdate } = useDecisionsWS()
 
   // 模拟图表数据 - 暂时使用,后续从performance.equity_curve获取
   const mockChartData = Array.from({ length: 20 }, (_, i) => ({
@@ -136,16 +136,25 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Success Notice */}
+        {/* Success Notice - WebSocket */}
         <div className="mt-6 glass-card p-4 border-l-4 border-success">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">✅</span>
-            <div>
-              <h3 className="font-bold text-success">Next.js迁移完成</h3>
-              <p className="text-sm text-gray-400">
-                已成功连接到Python后端API (localhost:5000),实时数据每5秒自动更新
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">⚡</span>
+              <div>
+                <h3 className="font-bold text-success">WebSocket实时推送已启用</h3>
+                <p className="text-sm text-gray-400">
+                  已连接到Python后端 (localhost:5001),数据延迟 &lt;100ms
+                </p>
+              </div>
             </div>
+            {(perfUpdate || posUpdate || decUpdate) && (
+              <div className="flex flex-col items-end gap-1 text-xs text-gray-500">
+                {perfUpdate && <div>性能: {perfUpdate.toLocaleTimeString()}</div>}
+                {posUpdate && <div>持仓: {posUpdate.toLocaleTimeString()}</div>}
+                {decUpdate && <div>决策: {decUpdate.toLocaleTimeString()}</div>}
+              </div>
+            )}
           </div>
         </div>
       </div>
