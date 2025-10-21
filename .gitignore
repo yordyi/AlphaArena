@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment
+.env
+*.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+dashboard.log
+bot.log
+
+# Data files
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!next.config.ts
+!tailwind.config.ts
+!postcss.config.js
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Next.js
+alpha-arena-nextjs/.next/
+alpha-arena-nextjs/out/
+alpha-arena-nextjs/node_modules/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Credentials (IMPORTANT - 永不提交!)
+credentials.json
+api_keys.txt
+secrets/

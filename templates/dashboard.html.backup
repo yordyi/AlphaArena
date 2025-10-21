@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Arena - DeepSeek-V3 AI Trading</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00D9FF;
+            --secondary: #7B61FF;
+            --accent: #FF00E5;
+            --success: #00FFA3;
+            --danger: #FF0080;
+            --warning: #FFB800;
+            --bg-dark: #0A0A0F;
+            --bg-darker: #050508;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #FFFFFF;
+            --text-secondary: #A0A0B8;
+            --glow-primary: rgba(0, 217, 255, 0.3);
+            --glow-secondary: rgba(123, 97, 255, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse at 20% 30%, rgba(123, 97, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(0, 217, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(255, 0, 229, 0.1) 0%, transparent 50%);
+            animation: bgShift 20s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+        }
+
+        /* Grid pattern overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+            animation: headerGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { filter: drop-shadow(0 0 20px var(--glow-primary)); }
+            50% { filter: drop-shadow(0 0 30px var(--glow-secondary)); }
+        }
+
+        .header .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+
+        .header .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .ai-badge .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 60px rgba(0, 217, 255, 0.2);
+        }
+
+        .stat-card h3 {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .stat-card .value.positive {
+            background: linear-gradient(135deg, var(--success), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-card .value.negative {
+            background: linear-gradient(135deg, var(--danger), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Positions Container */
+        .positions-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .positions-container h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .positions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .position-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .position-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .position-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .position-symbol {
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--primary);
+        }
+
+        .position-side {
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .position-side.long {
+            background: rgba(0, 255, 163, 0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .position-side.short {
+            background: rgba(255, 0, 128, 0.15);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .position-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .position-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .position-info-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.3rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .position-info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .position-pnl {
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .position-pnl.positive {
+            background: rgba(0, 255, 163, 0.1);
+            border: 1px solid rgba(0, 255, 163, 0.3);
+        }
+
+        .position-pnl.negative {
+            background: rgba(255, 0, 128, 0.1);
+            border: 1px solid rgba(255, 0, 128, 0.3);
+        }
+
+        .position-pnl-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.3rem;
+        }
+
+        .position-pnl-pct {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .no-positions {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-container h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        /* Trades Container */
+        .trades-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            overflow: hidden;
+        }
+
+        .trades-container h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        /* Table */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.02);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        td {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        tbody tr {
+            transition: all 0.2s;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .badge-long {
+            background: linear-gradient(135deg, rgba(0, 255, 163, 0.2), rgba(0, 255, 163, 0.1));
+            color: var(--success);
+            border: 1px solid rgba(0, 255, 163, 0.3);
+        }
+
+        .badge-short {
+            background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(255, 0, 128, 0.1));
+            color: var(--danger);
+            border: 1px solid rgba(255, 0, 128, 0.3);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 3rem;
+            padding: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .footer .update-time {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Loading animation */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            animation: loadingPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loadingPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-card .value {
+                font-size: 2rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            table {
+                font-size: 0.85rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+
+        /* AI Decision Cards */
+        .decision-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            border-left: 4px solid var(--primary);
+        }
+
+        .decision-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-left-color: var(--success);
+            transform: translateX(4px);
+        }
+
+        .decision-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+
+        .decision-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .decision-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .decision-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+
+        .decision-action .action-badge {
+            padding: 0.4rem 0.9rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .decision-action .action-badge.hold {
+            background: linear-gradient(135deg, rgba(255, 184, 0, 0.2), rgba(255, 184, 0, 0.1));
+            color: var(--warning);
+            border: 1px solid rgba(255, 184, 0, 0.3);
+        }
+
+        .decision-action .action-badge.buy {
+            background: linear-gradient(135deg, rgba(0, 255, 163, 0.2), rgba(0, 255, 163, 0.1));
+            color: var(--success);
+            border: 1px solid rgba(0, 255, 163, 0.3);
+        }
+
+        .decision-action .action-badge.sell {
+            background: linear-gradient(135deg, rgba(255, 0, 128, 0.2), rgba(255, 0, 128, 0.1));
+            color: var(--danger);
+            border: 1px solid rgba(255, 0, 128, 0.3);
+        }
+
+        .decision-action .action-badge.close {
+            background: linear-gradient(135deg, rgba(160, 160, 184, 0.2), rgba(160, 160, 184, 0.1));
+            color: var(--text-secondary);
+            border: 1px solid rgba(160, 160, 184, 0.3);
+        }
+
+        .decision-confidence {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .decision-reasoning {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid var(--secondary);
+            padding: 0.9rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-primary);
+            margin-top: 0.75rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-darker);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ ALPHA ARENA</h1>
+            <p class="subtitle">DeepSeek-V3 UltraThink AI Trading System</p>
+            <div class="ai-badge">
+                <span class="pulse"></span>
+                <span>AI LIVE TRADING</span>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>💰 账户价值</h3>
+                <div class="value" id="account-value">$0</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>📈 总回报率</h3>
+                <div class="value" id="total-return">0%</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>📊 夏普比率</h3>
+                <div class="value" id="sharpe-ratio">0.00</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>📉 最大回撤</h3>
+                <div class="value negative" id="max-drawdown">0%</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>🎯 胜率</h3>
+                <div class="value" id="win-rate">0%</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>🔢 总交易笔数</h3>
+                <div class="value" id="total-trades">0</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>📍 持仓数量</h3>
+                <div class="value" id="open-positions">0</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>💵 未实现盈亏</h3>
+                <div class="value" id="unrealized-pnl">$0</div>
+            </div>
+        </div>
+
+        <!-- 当前持仓 -->
+        <div class="positions-container">
+            <h2>📍 当前持仓</h2>
+            <div id="positions-grid" class="positions-grid">
+                <div class="loading">正在加载持仓信息...</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>📈 账户价值曲线</h2>
+            <div style="height: 400px; position: relative;">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+
+        <div class="trades-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="margin: 0;">🔥 最近交易记录</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="prev-page" style="padding: 6px 12px; background: rgba(0, 217, 255, 0.15); border: 1px solid var(--primary); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">← 上一页</button>
+                    <span id="page-info" style="color: var(--text-secondary); font-size: 0.9rem;">第 1 页</span>
+                    <button id="next-page" style="padding: 6px 12px; background: rgba(0, 217, 255, 0.15); border: 1px solid var(--primary); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">下一页 →</button>
+                </div>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>交易对</th>
+                            <th>操作</th>
+                            <th>数量</th>
+                            <th>价格</th>
+                            <th>杠杆</th>
+                            <th>信心度</th>
+                            <th>盈亏</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trades-tbody">
+                        <tr>
+                            <td colspan="8" class="loading">正在初始化AI交易系统...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="trades-container" style="margin-top: 2rem;">
+            <h2>🤖 AI实时决策日志</h2>
+            <div id="decisions-container">
+                <div class="loading">正在加载AI决策...</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="update-time">
+                <span>⏱</span>
+                <span>最后更新: <span id="last-update">-</span></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let chart = null;
+
+        // Update performance metrics
+        function updatePerformance() {
+            fetch('/api/performance')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const data = result.data;
+
+                        // Account Value
+                        document.getElementById('account-value').textContent =
+                            '$' + data.account_value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                        // Total Return
+                        const returnElem = document.getElementById('total-return');
+                        const returnValue = data.total_return_pct;
+                        returnElem.textContent = (returnValue >= 0 ? '+' : '') + returnValue.toFixed(2) + '%';
+                        returnElem.className = 'value ' + (returnValue >= 0 ? 'positive' : 'negative');
+
+                        // Sharpe Ratio
+                        const sharpeElem = document.getElementById('sharpe-ratio');
+                        sharpeElem.textContent = data.sharpe_ratio.toFixed(2);
+                        sharpeElem.className = 'value ' + (data.sharpe_ratio >= 1 ? 'positive' : '');
+
+                        // Max Drawdown
+                        document.getElementById('max-drawdown').textContent =
+                            data.max_drawdown_pct.toFixed(2) + '%';
+
+                        // Win Rate
+                        const winRateElem = document.getElementById('win-rate');
+                        winRateElem.textContent = data.win_rate_pct.toFixed(2) + '%';
+                        winRateElem.className = 'value ' + (data.win_rate_pct >= 50 ? 'positive' : '');
+
+                        // Total Trades
+                        document.getElementById('total-trades').textContent = data.total_trades;
+
+                        // Open Positions
+                        document.getElementById('open-positions').textContent = data.open_positions;
+
+                        // Unrealized P&L
+                        const pnlElem = document.getElementById('unrealized-pnl');
+                        pnlElem.textContent = '$' + data.unrealized_pnl.toFixed(2);
+                        pnlElem.className = 'value ' + (data.unrealized_pnl >= 0 ? 'positive' : 'negative');
+
+                        // Last Update
+                        document.getElementById('last-update').textContent =
+                            new Date(data.last_update).toLocaleString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                            });
+                    }
+                })
+                .catch(error => console.error('Performance update error:', error));
+        }
+
+        // Update chart (nof1.ai style)
+        function updateChart() {
+            fetch('/api/chart')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const data = result.data;
+
+                        if (data.length === 0) {
+                            // Show initial baseline
+                            const now = new Date();
+                            data.push({ time: now.toISOString(), value: 20 });
+                        }
+
+                        const labels = data.map(d => {
+                            const date = new Date(d.time);
+                            return date.toLocaleTimeString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        });
+                        const values = data.map(d => d.value);
+
+                        // Create baseline (initial capital)
+                        const initialCapital = 20;
+                        const baseline = new Array(values.length).fill(initialCapital);
+
+                        if (chart) {
+                            chart.destroy();
+                        }
+
+                        const ctx = document.getElementById('performanceChart').getContext('2d');
+
+                        // Create gradient for DeepSeek line
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                        gradient.addColorStop(0, 'rgba(0, 217, 255, 0.2)');
+                        gradient.addColorStop(1, 'rgba(0, 217, 255, 0.0)');
+
+                        chart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    // Baseline (dashed line)
+                                    {
+                                        label: '初始资金',
+                                        data: baseline,
+                                        borderColor: 'rgba(160, 160, 184, 0.4)',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: 2,
+                                        borderDash: [5, 5],
+                                        tension: 0,
+                                        fill: false,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 0
+                                    },
+                                    // DeepSeek V3 performance
+                                    {
+                                        label: 'DeepSeek V3 表现',
+                                        data: values,
+                                        borderColor: '#00D9FF',
+                                        backgroundColor: gradient,
+                                        borderWidth: 3,
+                                        tension: 0.4,
+                                        fill: true,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 8,
+                                        pointBackgroundColor: '#00D9FF',
+                                        pointBorderColor: '#0A0A0F',
+                                        pointBorderWidth: 3
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: {
+                                    intersect: false,
+                                    mode: 'index'
+                                },
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'top',
+                                        labels: {
+                                            color: '#A0A0B8',
+                                            font: {
+                                                family: 'Inter',
+                                                size: 12,
+                                                weight: '600'
+                                            },
+                                            padding: 15,
+                                            usePointStyle: true,
+                                            pointStyle: 'line'
+                                        }
+                                    },
+                                    tooltip: {
+                                        backgroundColor: 'rgba(10, 10, 15, 0.95)',
+                                        titleColor: '#00D9FF',
+                                        bodyColor: '#FFFFFF',
+                                        borderColor: '#00D9FF',
+                                        borderWidth: 1,
+                                        padding: 15,
+                                        displayColors: true,
+                                        callbacks: {
+                                            label: function(context) {
+                                                const label = context.dataset.label || '';
+                                                const value = context.parsed.y;
+                                                const diff = value - initialCapital;
+                                                const diffPct = ((diff / initialCapital) * 100).toFixed(2);
+                                                const sign = diff >= 0 ? '+' : '';
+                                                return label + ': $' + value.toFixed(2) +
+                                                       ' (' + sign + diffPct + '%)';
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: {
+                                            color: 'rgba(255, 255, 255, 0.05)',
+                                            drawBorder: false
+                                        },
+                                        ticks: {
+                                            color: '#A0A0B8',
+                                            maxTicksLimit: 15,
+                                            font: {
+                                                size: 11
+                                            }
+                                        }
+                                    },
+                                    y: {
+                                        grid: {
+                                            color: 'rgba(255, 255, 255, 0.08)',
+                                            drawBorder: false
+                                        },
+                                        ticks: {
+                                            color: '#A0A0B8',
+                                            callback: function(value) {
+                                                return '$' + value.toFixed(0);
+                                            },
+                                            font: {
+                                                size: 12,
+                                                family: 'JetBrains Mono'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => console.error('Chart update error:', error));
+        }
+
+        // Trades pagination
+        let currentPage = 1;
+        const tradesPerPage = 20;
+        let allTrades = [];
+
+        // Update trades table
+        function updateTrades() {
+            fetch('/api/trades')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        allTrades = result.data.reverse();
+                        renderTradesPage(currentPage);
+                    }
+                })
+                .catch(error => console.error('Trades update error:', error));
+        }
+
+        function renderTradesPage(page) {
+            const tbody = document.getElementById('trades-tbody');
+
+            if (allTrades.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="loading">暂无交易记录...</td></tr>';
+                document.getElementById('page-info').textContent = '第 0 页';
+                return;
+            }
+
+            const totalPages = Math.ceil(allTrades.length / tradesPerPage);
+            currentPage = Math.max(1, Math.min(page, totalPages));
+
+            const startIndex = (currentPage - 1) * tradesPerPage;
+            const endIndex = startIndex + tradesPerPage;
+            const pageTrades = allTrades.slice(startIndex, endIndex);
+
+            tbody.innerHTML = pageTrades.map(trade => {
+                const isLong = trade.action.includes('LONG');
+                const actionClass = isLong ? 'badge-long' : 'badge-short';
+
+                // 计算盈亏
+                let pnlHtml = '<td style="color: var(--text-secondary);">-</td>';
+                if (trade.pnl !== undefined && trade.pnl !== null) {
+                    const pnl = parseFloat(trade.pnl);
+                    const pnlColor = pnl >= 0 ? 'var(--success)' : 'var(--danger)';
+                    const pnlSign = pnl >= 0 ? '+' : '';
+                    pnlHtml = `<td style="color: ${pnlColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${pnlSign}$${pnl.toFixed(2)}</td>`;
+                }
+
+                return `
+                    <tr>
+                        <td>${new Date(trade.time).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}</td>
+                        <td><strong>${trade.symbol}</strong></td>
+                        <td><span class="badge ${actionClass}">${trade.action}</span></td>
+                        <td>${trade.quantity ? trade.quantity.toFixed(4) : '-'}</td>
+                        <td>$${trade.price ? trade.price.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}</td>
+                        <td>${trade.leverage}x</td>
+                        <td>${trade.confidence || '-'}%</td>
+                        ${pnlHtml}
+                    </tr>
+                `;
+            }).join('');
+
+            // Update page info
+            document.getElementById('page-info').textContent = `第 ${currentPage} / ${totalPages} 页`;
+
+            // Update button states
+            const prevBtn = document.getElementById('prev-page');
+            const nextBtn = document.getElementById('next-page');
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+            prevBtn.style.opacity = currentPage === 1 ? '0.5' : '1';
+            nextBtn.style.opacity = currentPage === totalPages ? '0.5' : '1';
+            prevBtn.style.cursor = currentPage === 1 ? 'not-allowed' : 'pointer';
+            nextBtn.style.cursor = currentPage === totalPages ? 'not-allowed' : 'pointer';
+        }
+
+        // Pagination event listeners
+        document.getElementById('prev-page').addEventListener('click', () => {
+            if (currentPage > 1) {
+                renderTradesPage(currentPage - 1);
+            }
+        });
+
+        document.getElementById('next-page').addEventListener('click', () => {
+            const totalPages = Math.ceil(allTrades.length / tradesPerPage);
+            if (currentPage < totalPages) {
+                renderTradesPage(currentPage + 1);
+            }
+        });
+
+        // Update AI decisions
+        function updateDecisions() {
+            fetch('/api/decisions')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const decisions = result.data;
+                        const container = document.getElementById('decisions-container');
+
+                        if (decisions.length === 0) {
+                            container.innerHTML = '<div class="loading">暂无AI决策记录...</div>';
+                            return;
+                        }
+
+                        container.innerHTML = decisions.map(decision => {
+                            // Determine action class
+                            let actionClass = 'hold';
+                            let actionText = decision.action;
+                            if (actionText.includes('BUY') || actionText.includes('LONG')) {
+                                actionClass = 'buy';
+                            } else if (actionText.includes('SELL') || actionText.includes('SHORT')) {
+                                actionClass = 'sell';
+                            } else if (actionText.includes('CLOSE')) {
+                                actionClass = 'close';
+                            }
+
+                            // 提取模型类型和推理过程
+                            const modelBadge = decision.model_used === 'deepseek-reasoner'
+                                ? '<span style="background: rgba(123, 97, 255, 0.2); color: #7B61FF; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">🧠 Reasoner</span>'
+                                : '<span style="background: rgba(0, 217, 255, 0.2); color: #00D9FF; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">💬 Chat</span>';
+
+                            const reasoningSection = decision.reasoning_content
+                                ? `<div style="margin-top: 8px; padding: 8px; background: rgba(123, 97, 255, 0.1); border-left: 3px solid #7B61FF; border-radius: 4px; font-size: 0.85rem; color: #A0A0B8;">
+                                    🧠 <strong>推理过程:</strong> ${decision.reasoning_content}
+                                </div>`
+                                : '';
+
+                            return `
+                                <div class="decision-card">
+                                    <div class="decision-header">
+                                        <span class="decision-symbol">${decision.symbol}${modelBadge}</span>
+                                        <span class="decision-time">${decision.time}</span>
+                                    </div>
+                                    <div class="decision-action">
+                                        <span class="action-badge ${actionClass}">${actionText}</span>
+                                        <span class="decision-confidence">信心度: ${decision.confidence}</span>
+                                    </div>
+                                    <div class="decision-reasoning">
+                                        💡 ${decision.reasoning}
+                                    </div>
+                                    ${reasoningSection}
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                })
+                .catch(error => console.error('Decisions update error:', error));
+        }
+
+        // Update positions
+        function updatePositions() {
+            fetch('/api/positions')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const positions = result.data;
+                        const grid = document.getElementById('positions-grid');
+
+                        if (positions.length === 0) {
+                            grid.innerHTML = '<div class="no-positions">暂无持仓 🌙</div>';
+                            return;
+                        }
+
+                        grid.innerHTML = positions.map(pos => {
+                            const pnlClass = pos.pnl_pct >= 0 ? 'positive' : 'negative';
+                            const pnlSign = pos.pnl_pct >= 0 ? '+' : '';
+                            const sideClass = pos.side === 'LONG' ? 'long' : 'short';
+
+                            return `
+                                <div class="position-card">
+                                    <div class="position-header">
+                                        <span class="position-symbol">${pos.symbol}</span>
+                                        <span class="position-side ${sideClass}">${pos.side_cn}</span>
+                                    </div>
+                                    <div class="position-info">
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">数量</span>
+                                            <span class="position-info-value">${pos.quantity}</span>
+                                        </div>
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">杠杆</span>
+                                            <span class="position-info-value">${pos.leverage}x</span>
+                                        </div>
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">开仓价</span>
+                                            <span class="position-info-value">$${pos.entry_price.toFixed(2)}</span>
+                                        </div>
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">当前价</span>
+                                            <span class="position-info-value">$${pos.current_price.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    <div class="position-pnl ${pnlClass}">
+                                        <div class="position-pnl-value">
+                                            ${pnlSign}$${Math.abs(pos.pnl_usd).toFixed(2)}
+                                        </div>
+                                        <div class="position-pnl-pct">
+                                            ${pnlSign}${pos.pnl_pct.toFixed(2)}%
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                })
+                .catch(error => console.error('Positions update error:', error));
+        }
+
+        // Initial load
+        updatePerformance();
+        updateChart();
+        updateTrades();
+        updateDecisions();
+        updatePositions();
+
+        // Auto refresh every 2 seconds (毫秒级实时更新)
+        setInterval(() => {
+            updatePerformance();
+            updateChart();
+            updateTrades();
+            updateDecisions();
+            updatePositions();
+        }, 2000);
+
+        // Show connection status
+        console.log('%c⚡ ALPHA ARENA DASHBOARD', 'font-size: 20px; font-weight: bold; color: #00D9FF;');
+        console.log('%cDeepSeek-V3 UltraThink AI Trading System', 'font-size: 14px; color: #7B61FF;');
+        console.log('%cConnected and monitoring...', 'font-size: 12px; color: #00FFA3;');
+    </script>
+</body>
+</html>

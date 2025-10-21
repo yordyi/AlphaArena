@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg-dark text-white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-glass backdrop-blur-glass border border-glass-border rounded-xl;
+  }
+
+  .stat-card {
+    @apply glass-card p-4 transition-all duration-300 shadow-sm;
+  }
+
+  .stat-card:hover {
+    @apply -translate-y-0.5 shadow-md;
+  }
+}
