@@ -2,9 +2,14 @@
 
 import dynamic from 'next/dynamic'
 
+interface CandlestickChartWrapperProps {
+  symbol?: string
+  initialInterval?: '1m' | '5m' | '15m' | '1h' | '4h' | '1d'
+}
+
 // 动态导入K线图组件，禁用SSR
-const CandlestickChart = dynamic(
-  () => import('./CandlestickChart').then((mod) => ({ default: mod.CandlestickChart })),
+const CandlestickChartDynamic = dynamic<CandlestickChartWrapperProps>(
+  () => import('./CandlestickChart').then((mod) => mod.CandlestickChart),
   {
     ssr: false,
     loading: () => (
@@ -26,11 +31,6 @@ const CandlestickChart = dynamic(
   }
 )
 
-interface CandlestickChartWrapperProps {
-  symbol?: string
-  initialInterval?: '1m' | '5m' | '15m' | '1h' | '4h' | '1d'
-}
-
 export function CandlestickChartWrapper(props: CandlestickChartWrapperProps) {
-  return <CandlestickChart {...props} />
+  return <CandlestickChartDynamic {...props} />
 }

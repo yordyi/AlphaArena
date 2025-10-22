@@ -205,6 +205,12 @@ export function useBinanceWS<T = MarketData>({
 
   // 连接WebSocket
   const connect = useCallback(() => {
+    // 只在浏览器环境中运行
+    if (typeof window === 'undefined') {
+      console.warn('⚠️ WebSocket 只能在浏览器环境中运行')
+      return
+    }
+
     try {
       const url = buildStreamUrl()
       console.log(`🔌 连接 Binance WebSocket: ${url}`)
@@ -240,7 +246,12 @@ export function useBinanceWS<T = MarketData>({
       }
 
       ws.onerror = (event) => {
-        console.error('❌ WebSocket 错误:', event)
+        console.error('❌ WebSocket 连接错误:', {
+          type: event.type,
+          url: url,
+          readyState: ws.readyState,
+          message: 'Failed to connect to Binance WebSocket'
+        })
         setError('WebSocket connection error')
         setConnected(false)
       }
