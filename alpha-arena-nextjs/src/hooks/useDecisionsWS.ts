@@ -46,7 +46,8 @@ export function useDecisionsWS() {
     // 监听新的AI决策(单个)
     socket.on('new_decision', (decision: AIDecision) => {
       console.log('🆕 New AI decision received:', decision.symbol, decision.action)
-      setData(prev => [decision, ...prev].slice(0, 20)) // 保持最新20条
+      // 保留所有历史记录，最多200条（避免内存溢出）
+      setData(prev => [decision, ...prev].slice(0, 200))
       setLastUpdate(new Date())
     })
 
