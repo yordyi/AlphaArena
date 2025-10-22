@@ -8,6 +8,7 @@ from datetime import datetime
 import logging
 import time
 import pandas as pd
+import os
 
 from deepseek_client import DeepSeekClient
 from binance_client import BinanceClient
@@ -339,13 +340,23 @@ class AITradingEngine:
         # ✅ 完全由DeepSeek决定！所有参数都由AI自主决策
         # fallback值仅在AI未返回时使用（理论上不应该发生）
         position_size_pct = min(decision.get('position_size', 1), max_position_pct)  # AI未返回时用最保守的1%
-        leverage = decision.get('leverage', 1)  # AI未返回时不使用杠杆
 
-        # 🔒 V5.0: 杠杆铁律 - 强制上限20x
-        MAX_LEVERAGE = 20
+        # 杠杆：由AI自主决定，不设默认值
+        leverage = decision.get('leverage')
+        if leverage is None:
+            self.logger.error(f"❌ AI未返回杠杆建议，跳过此次交易")
+            return {'success': False, 'error': 'AI未返回杠杆建议'}
+
+        leverage = int(leverage)
+
+        # 🔒 杠杆上限 - 最大30倍
+        MAX_LEVERAGE = 30
         if leverage > MAX_LEVERAGE:
             self.logger.warning(f"⚠️ AI建议杠杆{leverage}x超过上限{MAX_LEVERAGE}x，已强制降至{MAX_LEVERAGE}x")
             leverage = MAX_LEVERAGE
+        elif leverage < 1:
+            self.logger.warning(f"⚠️ AI建议杠杆{leverage}x过低，已强制调至1x")
+            leverage = 1
 
         stop_loss_pct = decision.get('stop_loss_pct', 1) / 100  # AI未返回时最保守1%止损
         take_profit_pct = decision.get('take_profit_pct', 2) / 100  # AI未返回时最保守2%止盈
@@ -409,8 +420,10 @@ class AITradingEngine:
                 quantity = round(raw_quantity, 1)  # BNB: 0.1
             elif 'SOL' in symbol:
                 quantity = round(raw_quantity, 1)  # SOL: 0.1
+            elif 'DOGE' in symbol:
+                quantity = round(raw_quantity, 0)  # DOGE: 整数
             else:
-                quantity = round(raw_quantity, 3)  # 默认: 0.001
+                quantity = round(raw_quantity, 1)  # 默认: 0.1 (大多数山寨币)
 
             # 确保不为0（小账户可能出现）
             if quantity == 0:
@@ -490,8 +503,10 @@ class AITradingEngine:
                 quantity = round(raw_quantity, 1)  # BNB: 0.1
             elif 'SOL' in symbol:
                 quantity = round(raw_quantity, 1)  # SOL: 0.1
+            elif 'DOGE' in symbol:
+                quantity = round(raw_quantity, 0)  # DOGE: 整数
             else:
-                quantity = round(raw_quantity, 3)  # 默认: 0.001
+                quantity = round(raw_quantity, 1)  # 默认: 0.1 (大多数山寨币)
 
             # 确保不为0（小账户可能出现）
             if quantity == 0:
