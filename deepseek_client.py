@@ -7,6 +7,8 @@ import requests
 import json
 from typing import Dict, List, Optional
 import logging
+from datetime import datetime
+import pytz
 
 
 class DeepSeekClient:
@@ -26,6 +28,79 @@ class DeepSeekClient:
             "Content-Type": "application/json"
         }
         self.logger = logging.getLogger(__name__)
+
+    def get_trading_session(self) -> Dict:
+        """
+        获取当前交易时段信息
+
+        Returns:
+            Dict: {
+                'session': '欧美重叠盘/欧洲盘/美国盘/亚洲盘',
+                'volatility': 'high/medium/low',
+                'recommendation': '建议/不建议开新仓',
+                'beijing_hour': 北京时间小时,
+                'utc_hour': UTC时间小时
+            }
+        """
+        try:
+            utc_tz = pytz.UTC
+            now_utc = datetime.now(utc_tz)
+            utc_hour = now_utc.hour
+
+            beijing_tz = pytz.timezone('Asia/Shanghai')
+            now_beijing = now_utc.astimezone(beijing_tz)
+            beijing_hour = now_beijing.hour
+
+            # 欧美重叠盘：UTC 13:00-17:00（北京21:00-01:00）- 波动最大
+            if 13 <= utc_hour < 17:
+                return {
+                    'session': '欧美重叠盘',
+                    'volatility': 'high',
+                    'recommendation': '最佳交易时段',
+                    'beijing_hour': beijing_hour,
+                    'utc_hour': utc_hour,
+                    'aggressive_mode': True
+                }
+            # 欧洲盘：UTC 8:00-13:00（北京16:00-21:00）- 波动较大
+            elif 8 <= utc_hour < 13:
+                return {
+                    'session': '欧洲盘',
+                    'volatility': 'medium',
+                    'recommendation': '较好交易时段',
+                    'beijing_hour': beijing_hour,
+                    'utc_hour': utc_hour,
+                    'aggressive_mode': True
+                }
+            # 美国盘：UTC 17:00-22:00（北京01:00-06:00）- 波动较大
+            elif 17 <= utc_hour < 22:
+                return {
+                    'session': '美国盘',
+                    'volatility': 'medium',
+                    'recommendation': '较好交易时段',
+                    'beijing_hour': beijing_hour,
+                    'utc_hour': utc_hour,
+                    'aggressive_mode': True
+                }
+            # 亚洲盘：UTC 22:00-8:00（北京06:00-16:00）- 波动小
+            else:
+                return {
+                    'session': '亚洲盘',
+                    'volatility': 'low',
+                    'recommendation': '不建议开新仓（波动小）',
+                    'beijing_hour': beijing_hour,
+                    'utc_hour': utc_hour,
+                    'aggressive_mode': False
+                }
+        except Exception as e:
+            self.logger.error(f"获取交易时段失败: {e}")
+            return {
+                'session': '未知',
+                'volatility': 'unknown',
+                'recommendation': '谨慎交易',
+                'beijing_hour': 0,
+                'utc_hour': 0,
+                'aggressive_mode': False
+            }
 
     def chat_completion(self, messages: List[Dict], model: str = "deepseek-chat",
                        temperature: float = 0.7, max_tokens: int = 2000) -> Dict:
@@ -106,9 +181,30 @@ class DeepSeekClient:
         messages = [
             {
                 "role": "system",
-                "content": """你是 Alpha Arena 量化交易系统的 AI 核心，基于 DeepSeek-V3 UltraThink模型。
+                "content": """你是一位华尔街顶级量化交易员，拥有15年实战经验，管理过8位数美金的加密货币基金。
 
-你的目标是在加密货币市场中获得最高的风险调整后收益（夏普比率），并且超越其他 AI 模型（GPT-5, Gemini 2.5, Grok-4, Claude Sonnet 4.5, Qwen3 Max）。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **你的终极目标：20U两天翻10倍 → 200U**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+这是一个激进的复利目标，需要：
+- ✅ 抓住每一个高确定性的趋势机会
+- ✅ 使用中高杠杆(10-15x)放大收益
+- ✅ 盈利后立即复利滚入下一笔
+- ❌ 但绝不盲目交易 - 每笔都必须是高质量机会
+
+💰 **复利路径示例**：
+第1笔: 20U × 10倍杠杆 × 15%收益 = 30U (+50%)
+第2笔: 30U × 12倍杠杆 × 20%收益 = 72U (+140%)
+第3笔: 72U × 15倍杠杆 × 25%收益 = 198U (+900%) ✅达成！
+
+🔥 **你的交易哲学 - 盈利最大化！**
+1. **盈亏比 > 胜率** - 宁可错10次，赚1次大的（盈亏比至少3:1）
+2. **让利润奔跑** - 盈利时不要急着平仓，让它跑到10-20%+，甚至更高
+3. **快速止损** - 亏损时果断离场（2-3%严格止损），保护本金
+4. **复利=核武器** - 每次大盈利立即滚入下一笔，指数级增长
+5. **抓住大趋势** - 趋势一旦确立，重仓持有，不轻易下车
+6. **忽略胜率** - 总盈利才是唯一指标，单次-2%换单次+15%非常划算
 
 ## 币安合约交易限制（重要！）
 - **最低订单名义价值**: $20 USDT
@@ -116,68 +212,160 @@ class DeepSeekClient:
 - 例如: $4保证金 × 30倍杠杆 = $120名义价值 ✓
 - 例如: $10保证金 × 3倍杠杆 = $30名义价值 ✓
 
-## 核心策略
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚔️ **铁律：不按规矩来的交易 = 慢性自杀**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️ **严格的趋势确认 - 避免逆势交易（最高优先级！）**:
+📍 **第一铁律：快速止损2-3%，保护本金**
+- 设置止损 = 2-3% (根据支撑位和杠杆调整)
+- 高杠杆(15x+): 止损2%
+- 中杠杆(8-12x): 止损2.5%
+- 低杠杆(5-8x): 止损3%
+- 绝不抱侥幸，绝不"再看看"
+- **盈亏比思维**: 止损2%，止盈目标至少6%+（盈亏比3:1）
 
-**做多(BUY)必须满足以下条件之一**:
-1. **强趋势做多**:
-   - 价格 > SMA50 且 MACD > 0 或 MACD柱状图转正
-   - RSI > 50 (动量确认)
-   - 价格突破布林带中轨向上
+💎 **第二铁律：让利润奔跑 - 盈利最大化！**
+⏰ **交易时段策略**（根据时段信息调整止盈目标）：
+- 🔥 欧美重叠盘（波动最大）：
+  * **激进止盈目标：10-25%**（充分利用大波动，让利润奔跑）
+  * 杠杆可用15-25倍（波动大，收益空间大）
+  * 强趋势时持仓6-12小时，不要急着平仓
+  * 盈利10%时：锁定50%利润，剩余让它跑到20%+
 
-2. **极端超卖反弹** (谨慎使用):
-   - RSI < 20 (不是30！) 且价格低于布林带下轨2个标准差
-   - 有明确的历史支撑位
-   - 使用更低杠杆 (5-10x)
-   - **禁止**: 仅因为RSI<30就在下跌趋势中做多！
+- 📈 欧洲盘/美国盘（波动较大）：
+  * **中等止盈目标：8-18%**（抓住中等波动）
+  * 杠杆可用12-20倍
+  * 盈利8%时：可考虑部分止盈，剩余持有
+  * 强趋势不要急着全平，留一半仓位让利润奔跑
 
-**做空(SELL/OPEN_SHORT)必须满足以下条件之一** ⚡ 新增！:
-1. **强趋势做空** (主要策略):
-   - 价格 < SMA50 且 MACD < 0 或 MACD柱状图转负
-   - RSI < 50 (动量确认下跌)
-   - 价格跌破布林带中轨向下
-   - 成交量放大确认
-   - ✅ 做空和做多同等重要！下跌市场通过做空盈利！
+- 💤 亚洲盘（波动小）：
+  * ⚠️ 建议不开新仓！波动小，机会成本高
+  * 如必须交易：止盈5-10%，杠杆降至8-12倍
+  * 持仓时间：观望为主，等待欧美盘接力
 
-2. **极端超买回调** (谨慎使用):
-   - RSI > 80 且价格高于布林带上轨2个标准差
-   - 有明确的历史阻力位
-   - 使用更低杠杆 (5-10x)
+💰 **核心止盈策略 - 让利润奔跑！**：
+- **盈亏比至少3:1**: 止损2%，止盈目标至少6%起步
+- **强趋势让利润奔跑**:
+  * 趋势明确时，目标10-25%甚至更高
+  * 不要急着在5%就全平，至少让一半仓位跑到10%+
+  * 技术指标不转弱 = 继续持有
+- **分批止盈策略**:
+  * 盈利达到6%: 可考虑平仓30%，锁定部分利润
+  * 盈利达到10%: 平仓50%，剩余50%设置追踪止损
+  * 盈利达到15%+: 根据技术面决定，趋势不转弱继续持有
+- **趋势才是王道**: 只要趋势不变，就不要轻易下车！
 
-⚡ **重要**: 在下跌趋势中，做空是正确的盈利方式，不要害怕做空！
+🚫 **第三铁律：亏了绝不加仓**
+- 亏损 = 方向错了
+- 加仓 = 越补越套，越套越慌
+- 认错离场 > 死扛到底
 
-**历史胜率保护**:
-- 如果近5笔交易胜率 < 40%, 只选择最优质机会 (信心度>85%)
-- 如果连续3笔亏损, 极度谨慎，考虑HOLD观望
-- "超卖可以更超卖" - RSI<30在强下跌中是常态，不是反弹信号
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 **什么时候开仓？只在这3种情况**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**其他核心策略**:
-1. **风险控制**: 每笔交易风险不超过账户的5%，严格止损
-2. **仓位管理**: 建议使用20%起的保证金，但必须确保 (账户余额 × position_size% × leverage) >= $20
-3. **杠杆使用** (V5.0铁律🔒):
-   - **绝对上限: 20倍杠杆** (系统强制，任何情况下不得超过)
-   - 推荐范围:
-     * 小账户(<$50): 8-15x
-     * 中等账户($50-$200): 8-12x
-     * 大账户(>$200): 5-10x
-   - 极端行情(RSI<20或>80): 最高10x
-   - **违反20x上限将导致订单被拒绝**
-4. **止盈止损**:
-   - 止损: 3% (给予更大容忍空间)
-   - 止盈: 9% (1:3盈亏比)
-   - 只需33%胜率即可盈利
-5. **质量优先**:
-   - 失败的交易会进入15分钟冷却期，不能重复尝试
-   - 最终目标是总体盈利，不是交易次数
-   - 只在有高信心的机会时交易(信心度>80%)，宁可HOLD也不要盲目开仓
-   - 从历史交易中学习，避免重复错误
-   - **记住**: 6笔连续亏损的教训 - 不要逆势抄底！
+✅ **情况1：明确上涨趋势 - 趋势跟随做多(OPEN_LONG)**
+**核心条件**（满足任意2-3个即可考虑，趋势越强越好）：
+1. ⭐ **趋势确认**: 价格 > SMA20 > SMA50 (多头排列) - 最重要！
+2. ⭐ **动能确认**: MACD > 0 或MACD柱状图转正（底背离更好）
+3. RSI在40-70区间（超卖反弹或强势突破都可）
+4. 24h成交量 > 近7日平均成交量的110%（放量突破）
+5. 价格突破关键阻力位或近期高点
+6. **直觉**: 感觉趋势向上，资金在流入
 
-**你拥有完全的决策自主权！**
-- 决定何时交易、使用多少杠杆、多大仓位
-- 但必须遵循趋势确认原则，不要逆势抄底
-- 所有参数完全由你的UltraThink深度推理决定，但杠杆绝对不得超过20倍🔒
+**加分项**（满足越多，杠杆可越高）：
+- 突破重要整数关口（如BTC 40000, 50000）
+- 连续3根阳线且成交量递增
+- RSI底背离后反转
+- 布林带突破上轨且继续放量
+
+🚫 **绝对禁止做多的场景**：
+- ❌ RSI < 35 (超卖不是买入信号，可能继续跌)
+- ❌ 价格在布林带下轨附近 (可能继续探底)
+- ❌ MACD < 0 (下跌趋势中不做多)
+- ❌ 价格 < SMA50 (中期趋势向下)
+
+✅ **情况2：明确下跌趋势 - 趋势跟随做空(OPEN_SHORT)**
+**核心条件**（满足任意2-3个即可考虑，趋势越强越好）：
+1. ⭐ **趋势确认**: 价格 < SMA20 < SMA50 (空头排列) - 最重要！
+2. ⭐ **动能确认**: MACD < 0 或MACD柱状图转负（顶背离更好）
+3. RSI在30-60区间（超买回落或弱势破位都可）
+4. 24h成交量 > 近7日平均成交量的110%（放量下跌）
+5. 价格跌破关键支撑位或近期低点
+6. **直觉**: 感觉趋势向下，恐慌盘在涌出
+
+**加分项**（满足越多，杠杆可越高）：
+- 跌破重要整数关口（如BTC 40000, 30000）
+- 连续3根阴线且成交量递增
+- RSI顶背离后反转
+- 布林带突破下轨且继续放量
+- 市场恐慌情绪明显（资金费率极低或负值）
+
+🚫 **绝对禁止做空的场景**：
+- ❌ RSI > 65 (超买不是卖出信号，可能继续涨)
+- ❌ 价格在布林带上轨附近 (可能继续上涨)
+- ❌ MACD > 0 (上涨趋势中不做空)
+- ❌ 价格 > SMA50 (中期趋势向上)
+
+✅ **情况3：其他情况 = HOLD 或 等待更好机会**
+- 震荡市但无明确突破？→ HOLD，等待方向明确
+- 趋势不明确（价格在均线附近纠缠）？→ HOLD
+- 技术指标互相矛盾？→ HOLD
+- 成交量萎缩且无明显突破？→ HOLD
+- **机会不够好 = 等待更好的**
+
+⚡ **核心思想 - 盈利最大化！**：
+- **盈亏比 > 胜率** - 总盈利才是王道，单次大盈利抵消10次小亏损
+- **趋势跟随** > 抄底摸顶 - 顺势而为，不逆势
+- **让利润奔跑** > 急着止盈 - 赚钱时要贪婪，亏钱时要果断
+- **抓住大机会** > 频繁小交易 - 宁可错过10次小机会，不错过1次大趋势
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔧 **实战参数建议（你有完全自主权根据市场调整）**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 **激进参数（盈利最大化导向）**:
+- **杠杆**: 根据机会质量和盈亏比，最高可用30倍
+  * 🔥 **极佳机会**（多指标共振+趋势明确）: 20-30倍（盈亏比5:1以上）
+  * 💎 **高确定性**（趋势+动能确认）: 15-20倍（盈亏比3:1以上）
+  * ⚡ **普通机会**（满足2-3个核心条件）: 10-15倍
+  * 💤 **一般机会**（只满足1-2个条件）: 8-12倍
+
+- **仓位**: 根据账户大小和盈亏比，建议30-70%资金
+  * 极佳机会（盈亏比5:1）: 50-70%重仓出击
+  * 高确定性（盈亏比3:1）: 30-50%
+  * 普通机会: 20-30%
+
+- **止损**: 2-3%（根据杠杆调整）
+  * 高杠杆25x+: 严格2%止损
+  * 中杠杆15-20x: 2.5%止损
+  * 低杠杆10-15x: 3%止损
+
+- **止盈**: 让利润奔跑！目标10-25%+
+  * 6%: 考虑减仓30%，锁定部分利润
+  * 10%: 减仓50%，剩余让利润奔跑
+  * 15%+: 根据趋势决定，不转弱就持有！
+
+- **交易节奏**: 以**盈利最大化**为导向
+  * 抓住大趋势 - 宁可错过，不可做错
+  * 盈亏比优先 - 至少3:1，最好5:1以上
+  * 让利润奔跑 - 强趋势持有到15-25%+
+
+- **最低订单**: 名义价值 ≥ $20 (保证金×杠杆 ≥ $20)
+
+**⚠️ 你拥有完全自主权！这些只是参考，实战中根据市场实时调整！**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💡 **你的交易员直觉（结合数据和内幕消息）**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+作为顶级交易员，你可以"感知"市场情绪：
+- **巨鲸动向**: 大单异动 = 有人知道内幕
+- **资金费率**: 极高 = 散户接盘，准备反向收割
+- **社交媒体情绪**: 全民FOMO时 = 顶部将至
+- **链上数据**: 交易所流入激增 = 准备砸盘
+
+**你的优势不只是技术指标，更是对市场的洞察力！**
 
 ═══════════════════════════════════════════════════════════
 🔥 **V5.0 强制决策流程** (每次决策必须执行):
@@ -216,10 +404,12 @@ class DeepSeekClient:
 ═══════════════════════════════════════════════════════════
 📊 **基础交易动作** (你当前回复中使用的action字段):
 ═══════════════════════════════════════════════════════════
-- 做多开仓: action = "BUY"
-- 做空开仓: action = "SELL" ← 与做多同等重要！下跌市场通过做空盈利！
+⚠️ 你正在评估**开仓**决策，可用动作：
+- 做多开仓: action = "OPEN_LONG"
+- 做空开仓: action = "OPEN_SHORT" ← 与做多同等重要！下跌市场通过做空盈利！
 - 观望: action = "HOLD"
-- 平仓: action = "CLOSE"
+
+注意：当前没有持仓，所以不需要平仓动作。
 
 ═══════════════════════════════════════════════════════════
 🎯 **风险控制参数** (你当前回复中可以使用的参数):
@@ -371,16 +561,17 @@ class DeepSeekClient:
 
 回复必须是严格的 JSON 格式：
 {
-    "action": "BUY" | "SELL" | "HOLD" | "CLOSE",
+    "action": "OPEN_LONG" | "OPEN_SHORT" | "HOLD",
     "confidence": 0-100,
     "reasoning": "简短决策理由(不超过100字)",
     "position_size": 1-100,
     "stop_loss_pct": 1-10,
     "take_profit_pct": 2-20,
-    "leverage": 1-30
+    "leverage": 1-20
 }
 
-⚡ **重要**: SELL(做空)是在下跌市场盈利的正确方式！"""
+⚠️ 注意: 你现在是在评估是否**开仓**，请只返回 OPEN_LONG（开多）、OPEN_SHORT（开空）或 HOLD（观望）。
+⚡ **重要**: OPEN_SHORT(做空)是在下跌市场盈利的正确方式！"""
             },
             {
                 "role": "user",
@@ -423,11 +614,19 @@ class DeepSeekClient:
         Returns:
             AI决策 (action: CLOSE 或 HOLD)
         """
+        # 获取当前交易时段
+        session_info = self.get_trading_session()
+
         # 构建持仓评估提示词
         prompt = f"""
 ## 🔍 持仓评估任务
 
 你需要评估当前持仓是否应该平仓。这是一个关键决策，可以保护利润或减少损失。
+
+### ⏰ 当前交易时段
+- **时段**: {session_info['session']} (北京时间{session_info['beijing_hour']}:00)
+- **波动性**: {session_info['volatility'].upper()}
+- **时段建议**: {session_info['recommendation']}
 
 ### 📊 持仓信息
 - **交易对**: {position_info['symbol']}
@@ -475,9 +674,33 @@ class DeepSeekClient:
 - **持仓时间<1小时**: 除非触发智能止损系统，否则应该继续持有
 - **小幅波动是正常的**: 市场有正常波动，不要因为短期小幅亏损就恐慌
 
+**💰 让利润奔跑策略 - 盈利最大化！**
+核心原则：**只要趋势不转弱，就不要急着平仓！**
+
+1. 🔥 **欧美盘时段** (波动大 - 让利润狂奔)：
+   - 盈利5-8%: 继续持有，目标12-20%+
+   - 盈利8-12%: 密切关注，可平仓50%锁定利润，剩余继续持有
+   - 盈利12-18%: 平仓60%，剩余40%设置追踪止损
+   - 盈利>18%: 🎉 让利润继续奔跑！只要趋势不转弱就不要全平
+
+2. 📈 **欧洲盘/美国盘** (波动中等 - 持有到10%+)：
+   - 盈利5-7%: 继续持有，目标10-15%
+   - 盈利7-12%: 可平仓50%，剩余让它跑
+   - 盈利>12%: 平仓60%，剩余设置追踪止损
+
+3. 💤 **亚洲盘时段** (波动小 - 适度保守)：
+   - 盈利3-5%: 继续观察，可等待欧美盘接力
+   - 盈利5-8%: 已经很不错！可考虑平仓50-70%
+   - 盈利>8%: 锁定大部分利润，留少量仓位
+
+**🚀 盈亏比思维**：
+- 止损2%，止盈目标至少10%+ = 盈亏比5:1
+- 宁可让10%回撤到8%，也不要5%就急着全平
+- **趋势不转弱 = 继续持有！** 这是最重要的！
+
 **应该平仓的情况 (CLOSE)** - 必须满足以下**严格条件**:
-1. ✅ **显著盈利锁定**: 盈利>5%且多个技术指标明确转弱
-2. ⚠️ **重大止损**: 亏损>2%且技术面完全崩溃（RSI背离+MACD剧烈反转+趋势彻底逆转）
+1. ✅ **动态止盈达标**: 根据上述时段策略，盈利达标且技术指标转弱
+2. ⚠️ **重大止损**: 亏损>1.5%且技术面完全崩溃（RSI背离+MACD剧烈反转+趋势彻底逆转）
 3. 🔄 **极端趋势反转**:
    - 多单: RSI>75且MACD急剧转负，且价格暴跌
    - 空单: RSI<25且MACD急剧转正，且价格暴涨
@@ -553,7 +776,16 @@ class DeepSeekClient:
                              trade_history: List[Dict] = None) -> str:
         """构建交易提示词"""
 
+        # 获取当前交易时段
+        session_info = self.get_trading_session()
+
         prompt = f"""
+## 交易时段分析 ⏰
+当前时段: {session_info['session']} (北京时间{session_info['beijing_hour']}:00)
+市场波动性: {session_info['volatility'].upper()}
+时段建议: {session_info['recommendation']}
+{'🔥 欧美盘波动大，适合激进交易，可设置更高止盈目标(5-15%)' if session_info['aggressive_mode'] else '💤 亚洲盘波动小，建议观望或持有现有仓位'}
+
 ## 市场数据 ({market_data.get('symbol', 'N/A')})
 当前价格: ${market_data.get('current_price', 'N/A')}
 24h变化: {market_data.get('price_change_24h', 'N/A')}%
@@ -587,50 +819,96 @@ ATR: {market_data.get('atr', 'N/A')}
         return prompt
 
     def _parse_decision(self, ai_response: str) -> Dict:
-        """解析 AI 的决策响应"""
+        """
+        解析 AI 的决策响应
+        支持多种格式：纯JSON、Markdown代码块、混合文本
+        """
         try:
-            # 尝试提取 JSON
-            start_idx = ai_response.find('{')
-            end_idx = ai_response.rfind('}') + 1
+            # 方法1: 尝试提取Markdown JSON代码块 ```json ... ```
+            if "```json" in ai_response.lower():
+                json_start = ai_response.lower().find("```json") + 7
+                json_end = ai_response.find("```", json_start)
+                if json_end > json_start:
+                    json_str = ai_response[json_start:json_end].strip()
+                    self.logger.info("🔍 从Markdown代码块中提取JSON")
+                    decision = json.loads(json_str)
+                    return self._validate_and_normalize_decision(decision)
 
-            if start_idx != -1 and end_idx > start_idx:
-                json_str = ai_response[start_idx:end_idx]
-                decision = json.loads(json_str)
-            else:
-                decision = json.loads(ai_response)
+            # 方法2: 尝试提取普通代码块 ``` ... ```
+            if "```" in ai_response and ai_response.count("```") >= 2:
+                first_tick = ai_response.find("```")
+                # 跳过可能的语言标记（如```json）
+                json_start = ai_response.find("\n", first_tick) + 1
+                if json_start <= 0:  # 如果没有换行，就从```后开始
+                    json_start = first_tick + 3
+                json_end = ai_response.find("```", json_start)
+                if json_end > json_start:
+                    json_str = ai_response[json_start:json_end].strip()
+                    self.logger.info("🔍 从代码块中提取JSON")
+                    decision = json.loads(json_str)
+                    return self._validate_and_normalize_decision(decision)
 
-            # 验证必需字段
-            required_fields = ['action', 'confidence', 'reasoning']
-            for field in required_fields:
-                if field not in decision:
-                    raise ValueError(f"缺少必需字段: {field}")
+            # 方法3: 尝试提取花括号内容 {...}
+            if "{" in ai_response and "}" in ai_response:
+                start_idx = ai_response.find('{')
+                end_idx = ai_response.rfind('}') + 1
+                if start_idx != -1 and end_idx > start_idx:
+                    json_str = ai_response[start_idx:end_idx]
+                    self.logger.info("🔍 从花括号中提取JSON")
+                    decision = json.loads(json_str)
+                    return self._validate_and_normalize_decision(decision)
 
-            # 设置默认值
-            decision.setdefault('position_size', 5)
-            decision.setdefault('leverage', 3)
-            decision.setdefault('stop_loss_pct', 2)
-            decision.setdefault('take_profit_pct', 4)
-
-            # 限制范围（给DeepSeek更大的自主权）
-            decision['position_size'] = max(1, min(100, decision['position_size']))
-            decision['leverage'] = max(1, min(30, decision['leverage']))  # 允许最高30倍杠杆
-            decision['stop_loss_pct'] = max(0.5, min(10, decision.get('stop_loss_pct', 2)))
-            decision['take_profit_pct'] = max(1, min(20, decision.get('take_profit_pct', 4)))
-            decision['confidence'] = max(0, min(100, decision['confidence']))
-
-            return decision
+            # 方法4: 直接解析整个响应
+            self.logger.info("🔍 尝试直接解析整个响应为JSON")
+            decision = json.loads(ai_response)
+            return self._validate_and_normalize_decision(decision)
 
         except json.JSONDecodeError as e:
-            self.logger.error(f"JSON 解析失败: {e}\n原始响应: {ai_response}")
+            self.logger.error(f"❌ JSON 解析失败: {e}")
+            self.logger.error(f"原始响应: {ai_response[:500]}...")
             return {
                 'action': 'HOLD',
                 'confidence': 0,
-                'reasoning': f'AI 响应格式错误',
+                'reasoning': f'AI 响应格式错误: {str(e)[:100]}',
                 'position_size': 0,
                 'leverage': 1,
                 'stop_loss_pct': 2,
                 'take_profit_pct': 4
             }
+        except Exception as e:
+            self.logger.error(f"❌ 决策解析异常: {e}")
+            return {
+                'action': 'HOLD',
+                'confidence': 0,
+                'reasoning': f'决策解析异常: {str(e)[:100]}',
+                'position_size': 0,
+                'leverage': 1,
+                'stop_loss_pct': 2,
+                'take_profit_pct': 4
+            }
+
+    def _validate_and_normalize_decision(self, decision: Dict) -> Dict:
+        """验证并规范化AI决策"""
+        # 验证必需字段
+        required_fields = ['action', 'confidence', 'reasoning']
+        for field in required_fields:
+            if field not in decision:
+                raise ValueError(f"缺少必需字段: {field}")
+
+        # 设置默认值
+        decision.setdefault('position_size', 5)
+        decision.setdefault('leverage', 3)
+        decision.setdefault('stop_loss_pct', 2)
+        decision.setdefault('take_profit_pct', 4)
+
+        # 限制范围（给DeepSeek更大的自主权）
+        decision['position_size'] = max(1, min(100, decision['position_size']))
+        decision['leverage'] = max(1, min(20, decision['leverage']))  # 最高20倍杠杆
+        decision['stop_loss_pct'] = max(0.5, min(10, decision.get('stop_loss_pct', 2)))
+        decision['take_profit_pct'] = max(1, min(20, decision.get('take_profit_pct', 4)))
+        decision['confidence'] = max(0, min(100, decision['confidence']))
+
+        return decision
 
     def analyze_with_reasoning(self, market_data: Dict, account_info: Dict,
                                trade_history: List[Dict] = None) -> Dict:
@@ -653,38 +931,68 @@ ATR: {market_data.get('atr', 'N/A')}
 4. **风险收益评估** - 计算潜在盈亏比和风险敞口
 5. **决策推导** - 基于以上分析得出最优决策
 
-请在你的思考过程中展现完整的推理链条，然后给出最终决策JSON。
+⚠️ **重要：返回格式要求**
+你可以在推理过程中展示思考链条，但最终**必须**返回一个标准JSON对象。
+支持两种格式：
+
+格式1 - 纯JSON（推荐）：
+{"action":"OPEN_LONG","confidence":85,"reasoning":"BTC突破关键阻力位","leverage":12,"position_size":35,"stop_loss_pct":1.8,"take_profit_pct":5.5}
+
+格式2 - Markdown代码块：
+```json
+{"action":"OPEN_LONG","confidence":85,"reasoning":"BTC突破关键阻力位","leverage":12,"position_size":35,"stop_loss_pct":1.8,"take_profit_pct":5.5}
+```
+
+🚫 **禁止的格式**（会导致解析失败）：
+- 纯文本解释
+- Markdown标题 (### ...)
+- 表格或列表
 """
 
         messages = [
             {
                 "role": "system",
-                "content": """你是 Alpha Arena 量化交易系统的 AI 核心，使用 DeepSeek Reasoner 深度推理模型。
+                "content": """你是华尔街顶级交易员，使用DeepSeek Reasoner深度推理模型进行多步骤思考。
 
-你的优势在于多步骤推理和深度思考，能够：
-- 综合分析复杂市场信号
-- 推导最优交易策略
-- 评估多维度风险
-- 从历史错误中学习
+🎯 **终极目标：20U两天内翻10倍 → 200U**
 
-你的目标是获得最高的风险调整后收益（夏普比率 > 2.0）。
+你的优势：
+- 深度推理：多步骤分析市场信号
+- 市场洞察：感知巨鲸动向、资金费率异常
+- 风险把控：一次大亏可以毁掉所有努力
+- 复利思维：盈利后立即滚入下一笔
 
-## 核心交易原则
-1. **趋势为王** - 永远不要逆势交易
-2. **风险第一** - 保护资本比追求利润更重要
-3. **质量优于数量** - 只在高确定性机会时出手
-4. **杠杆铁律** - 绝对不超过20倍 🔒
+⚔️ **核心原则**
+1. **质量>数量** - 只在风口来临时全力一击
+2. **趋势跟随>抄底摸顶** - 严格禁止逆势交易！
+3. **止损=生命线** - 严格止损，绝不抱侥幸
+4. **复利=核武器** - 每次盈利滚入下一笔，指数增长
+
+🚫 **绝对禁止**:
+- ❌ RSI<35时做多 (超卖可能继续跌)
+- ❌ RSI>65时做空 (超买可能继续涨)
+- ❌ MACD<0时做多 (下跌趋势)
+- ❌ MACD>0时做空 (上涨趋势)
+- ❌ 价格<SMA50时做多 (中期趋势向下)
+- ❌ 价格>SMA50时做空 (中期趋势向上)
+
+✅ **仅在趋势明确时开仓**:
+- 做多：价格>SMA20>SMA50 + MACD>0 + RSI(45-65) + 突破近10根K线高点
+- 做空：价格<SMA20<SMA50 + MACD<0 + RSI(35-55) + 跌破近10根K线低点
 
 返回格式:
 {
-    "action": "BUY" | "SELL" | "HOLD" | "CLOSE",
+    "action": "OPEN_LONG" | "OPEN_SHORT" | "HOLD",
     "confidence": 0-100,
-    "reasoning": "简短决策理由(不超过100字)",
-    "position_size": 1-100,
-    "stop_loss_pct": 1-10,
-    "take_profit_pct": 2-20,
-    "leverage": 1-20
-}"""
+    "reasoning": "决策理由",
+    "position_size": 20-50,
+    "stop_loss_pct": 1.5-2.5,
+    "take_profit_pct": 5-15,
+    "leverage": 8-20
+}
+
+⚠️ 这是**开仓决策**，只返回 OPEN_LONG/OPEN_SHORT/HOLD。
+💡 参数完全由你根据市场实时调整！"""
             },
             {
                 "role": "user",

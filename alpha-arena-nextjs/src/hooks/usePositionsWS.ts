@@ -11,10 +11,13 @@ export function usePositionsWS() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   useEffect(() => {
+    // 浏览器环境检查
+    if (typeof window === 'undefined') return
+
     const socket = getSocket()
 
-    // 初始数据获取
-    const fetchInitialData = async () => {
+    // 数据获取函数
+    const fetchData = async () => {
       try {
         const response = await fetch('/api/positions')
         const result = await response.json()
@@ -24,7 +27,7 @@ export function usePositionsWS() {
           setError(null)
           setLastUpdate(new Date())
         } else {
-          setError('Failed to fetch initial positions')
+          setError('Failed to fetch positions')
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -33,9 +36,9 @@ export function usePositionsWS() {
       }
     }
 
-    fetchInitialData()
+    fetchData()
 
-    // 监听WebSocket实时更新
+    // 监听WebSocket实时更新（作为备选）
     socket.on('positions_update', (newData: Position[]) => {
       console.log('📍 Positions update received via WebSocket')
       setData(newData)
@@ -43,9 +46,15 @@ export function usePositionsWS() {
       setError(null)
     })
 
+    // 同时使用定时轮询作为fallback（每2秒刷新）
+    const pollingInterval = setInterval(() => {
+      fetchData()
+    }, 2000)
+
     // 清理
     return () => {
       socket.off('positions_update')
+      clearInterval(pollingInterval)
     }
   }, [])
 

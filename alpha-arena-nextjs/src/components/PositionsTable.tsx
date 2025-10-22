@@ -7,8 +7,11 @@ interface PositionsTableProps {
 }
 
 export function PositionsTable({ positions }: PositionsTableProps) {
+  // 类型保护：确保positions是数组
+  const positionsArray = Array.isArray(positions) ? positions : []
+
   // 空状态
-  if (positions.length === 0) {
+  if (positionsArray.length === 0) {
     return (
       <div className="glass-card-hover p-6 group">
         {/* 标题 */}
@@ -47,7 +50,7 @@ export function PositionsTable({ positions }: PositionsTableProps) {
           <h2 className="text-xl font-bold text-gradient-cyan">当前持仓</h2>
         </div>
         <div className="badge-primary">
-          {positions.length} 持仓
+          {positionsArray.length} 持仓
         </div>
       </div>
 
@@ -83,7 +86,7 @@ export function PositionsTable({ positions }: PositionsTableProps) {
 
           {/* 表体 */}
           <tbody>
-            {positions.map((position, index) => {
+            {positionsArray.map((position, index) => {
               // 兼容API返回的字段名：pnl_usd, pnl_pct, quantity
               const pnl = (position as any).pnl_usd ?? (position as any).unrealized_pnl ?? 0
               const pnlPct = (position as any).pnl_pct ?? (position as any).unrealized_pnl_pct ?? 0
@@ -170,17 +173,17 @@ export function PositionsTable({ positions }: PositionsTableProps) {
       {/* 底部统计 */}
       <div className="mt-6 pt-4 border-t border-glass-border flex items-center justify-between text-sm">
         <div className="text-gray-400">
-          总持仓: <span className="text-white font-semibold">{positions.length}</span>
+          总持仓: <span className="text-white font-semibold">{positionsArray.length}</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-gray-400">
             总盈亏:
             <span className={`ml-2 font-bold ${
-              positions.reduce((sum, p: any) => sum + (p.pnl_usd ?? p.unrealized_pnl ?? 0), 0) >= 0
+              positionsArray.reduce((sum, p: any) => sum + (p.pnl_usd ?? p.unrealized_pnl ?? 0), 0) >= 0
                 ? 'text-success'
                 : 'text-danger'
             }`}>
-              ${positions.reduce((sum, p: any) => sum + (p.pnl_usd ?? p.unrealized_pnl ?? 0), 0).toFixed(2)}
+              ${positionsArray.reduce((sum, p: any) => sum + (p.pnl_usd ?? p.unrealized_pnl ?? 0), 0).toFixed(2)}
             </span>
           </div>
         </div>

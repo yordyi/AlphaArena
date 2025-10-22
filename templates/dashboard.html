@@ -197,7 +197,7 @@
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 0.75rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
         }
 
         @media (max-width: 1400px) {
@@ -685,6 +685,7 @@
             grid-template-columns: 1fr 400px;
             gap: 2rem;
             margin-top: 0;
+            align-items: start;  /* 确保顶部对齐 */
         }
 
         .content-left {
@@ -695,9 +696,9 @@
 
         .content-right {
             position: sticky;
-            top: 2rem;
+            top: 0;  /* 从顶部开始 */
             height: fit-content;
-            max-height: calc(100vh - 4rem);
+            max-height: 100vh;
             overflow-y: auto;
         }
 
@@ -840,53 +841,52 @@
             </div>
         </div>
 
-        <!-- 性能指标卡片 - 紧凑顶部布局 -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>💰 账户价值</h3>
-                <div class="value" id="account-value">$0</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>📈 总回报率</h3>
-                <div class="value" id="total-return">0%</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>📊 夏普比率</h3>
-                <div class="value" id="sharpe-ratio">0.00</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>📉 最大回撤</h3>
-                <div class="value negative" id="max-drawdown">0%</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>🎯 胜率</h3>
-                <div class="value" id="win-rate">0%</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>🔢 总交易笔数</h3>
-                <div class="value" id="total-trades">0</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>📍 持仓数量</h3>
-                <div class="value" id="open-positions">0</div>
-            </div>
-
-            <div class="stat-card">
-                <h3>💵 未实现盈亏</h3>
-                <div class="value" id="unrealized-pnl">$0</div>
-            </div>
-        </div>
-
-        <!-- 两栏布局 -->
+        <!-- 两栏布局（包含性能指标和AI决策） -->
         <div class="main-content">
             <!-- 左侧内容 -->
             <div class="content-left">
+                <!-- 性能指标卡片 - 与持仓卡片宽度对齐 -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>💰 账户价值</h3>
+                        <div class="value" id="account-value">$0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📈 总回报率</h3>
+                        <div class="value" id="total-return">0%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📊 夏普比率</h3>
+                        <div class="value" id="sharpe-ratio">0.00</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📉 最大回撤</h3>
+                        <div class="value negative" id="max-drawdown">0%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>🎯 胜率</h3>
+                        <div class="value" id="win-rate">0%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>🔢 总交易笔数</h3>
+                        <div class="value" id="total-trades">0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📍 持仓数量</h3>
+                        <div class="value" id="open-positions">0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>💵 未实现盈亏</h3>
+                        <div class="value" id="unrealized-pnl">$0</div>
+                    </div>
+                </div>
                 <!-- 当前持仓 -->
                 <div class="positions-container">
                     <h2>📍 当前持仓</h2>

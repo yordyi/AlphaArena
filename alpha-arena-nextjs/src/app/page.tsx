@@ -97,62 +97,135 @@ export default function Home() {
           <MarketTicker symbols={['BTCUSDT', 'ETHUSDT', 'BNBUSDT']} />
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <StatCard
-            icon="💰"
-            title="账户价值"
-            value={performance.account_value}
-            prefix="$"
-            valueColor="primary"
-            change={performance.total_return_pct}
-          />
-          <StatCard
-            icon="📈"
-            title="总回报率"
-            value={performance.total_return_pct}
-            suffix="%"
-            valueColor={performance.total_return_pct >= 0 ? 'success' : 'danger'}
-          />
-          <StatCard
-            icon="📊"
-            title="夏普比率"
-            value={performance.sharpe_ratio}
-            valueColor="warning"
-          />
-          <StatCard
-            icon="📉"
-            title="最大回撤"
-            value={Math.abs(performance.max_drawdown)}
-            suffix="%"
-            valueColor="danger"
-          />
-          <StatCard
-            icon="🎯"
-            title="胜率"
-            value={performance.win_rate}
-            suffix="%"
-            valueColor="success"
-          />
-          <StatCard
-            icon="🔄"
-            title="总交易数"
-            value={performance.total_trades}
-            valueColor="white"
-          />
-          <StatCard
-            icon="📍"
-            title="持仓数量"
-            value={performance.positions_count}
-            valueColor="primary"
-          />
-          <StatCard
-            icon="💹"
-            title="日均收益"
-            value={performance.avg_daily_return}
-            suffix="%"
-            valueColor={performance.avg_daily_return >= 0 ? 'success' : 'danger'}
-          />
+        {/* Stats Grid - 专业交易仪表板布局 */}
+        <div className="mb-6 space-y-4">
+          {/* 第一层：核心账户指标 - 大卡片展示 */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* 账户总价值 - 最重要指标 */}
+            <div className="glass-card p-6 border-l-4 border-primary">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-4xl">💰</span>
+                    <span className="text-sm text-gray-400 font-medium">账户总价值</span>
+                  </div>
+                  <div className="text-4xl font-bold text-primary mb-2">
+                    ${performance.account_value?.toFixed(2) || '0.00'}
+                  </div>
+                  {performance.total_return_pct !== undefined && (
+                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg ${performance.total_return_pct >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
+                      <span className="text-lg font-bold">
+                        {performance.total_return_pct >= 0 ? '▲' : '▼'}
+                      </span>
+                      <span className="text-lg font-semibold">
+                        {Math.abs(performance.total_return_pct).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 总回报率 - 次重要指标 */}
+            <div className={`glass-card p-6 border-l-4 ${performance.total_return_pct >= 0 ? 'border-success' : 'border-danger'}`}>
+              <div className="flex items-start justify-between">
+                <div className="w-full">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-4xl">📈</span>
+                    <span className="text-sm text-gray-400 font-medium">总回报率</span>
+                  </div>
+                  <div className={`text-4xl font-bold mb-3 ${performance.total_return_pct >= 0 ? 'text-success' : 'text-danger'}`}>
+                    {performance.total_return_pct >= 0 ? '+' : ''}{performance.total_return_pct?.toFixed(2) || '0.00'}%
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">盈亏金额</div>
+                      <div className={`text-base font-semibold ${(performance.total_return_pct || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {(performance.total_return_pct || 0) >= 0 ? '+' : ''}${((performance.account_value || 0) - 10000).toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">日均收益</div>
+                      <div className={`text-base font-semibold ${(performance.avg_daily_return || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                        {(performance.avg_daily_return || 0) >= 0 ? '+' : ''}{(performance.avg_daily_return || 0).toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 第二层：核心绩效指标 */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="glass-card p-4 hover:bg-glass-light/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl">📊</span>
+                <span className="text-sm text-gray-400">夏普比率</span>
+              </div>
+              <div className="text-2xl font-bold text-warning">
+                {performance.sharpe_ratio?.toFixed(2) || '0.00'}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {(performance.sharpe_ratio || 0) > 2 ? '优秀' : (performance.sharpe_ratio || 0) > 1 ? '良好' : '一般'}
+              </div>
+            </div>
+
+            <div className="glass-card p-4 hover:bg-glass-light/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl">📉</span>
+                <span className="text-sm text-gray-400">最大回撤</span>
+              </div>
+              <div className="text-2xl font-bold text-danger">
+                {Math.abs(performance.max_drawdown_pct || 0).toFixed(2)}%
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {Math.abs(performance.max_drawdown_pct || 0) < 10 ? '优秀' : Math.abs(performance.max_drawdown_pct || 0) < 20 ? '可接受' : '需注意'}
+              </div>
+            </div>
+
+            <div className="glass-card p-4 hover:bg-glass-light/50 transition-all duration-300">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl">🎯</span>
+                <span className="text-sm text-gray-400">胜率</span>
+              </div>
+              <div className="text-2xl font-bold text-success">
+                {performance.win_rate_pct?.toFixed(1) || '0.0'}%
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {(performance.win_rate_pct || 0) > 60 ? '优秀' : (performance.win_rate_pct || 0) > 50 ? '良好' : '一般'}
+              </div>
+            </div>
+          </div>
+
+          {/* 第三层：辅助统计指标 - 紧凑布局 */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="glass-card p-3 flex items-center gap-3 hover:bg-glass-light/30 transition-all duration-300">
+              <span className="text-2xl">🔄</span>
+              <div className="flex-1">
+                <div className="text-xs text-gray-500">总交易数</div>
+                <div className="text-xl font-bold text-white">{performance.total_trades || 0}</div>
+              </div>
+            </div>
+
+            <div className="glass-card p-3 flex items-center gap-3 hover:bg-glass-light/30 transition-all duration-300">
+              <span className="text-2xl">📍</span>
+              <div className="flex-1">
+                <div className="text-xs text-gray-500">持仓数量</div>
+                <div className="text-xl font-bold text-primary">{performance.open_positions || 0}</div>
+              </div>
+            </div>
+
+            <div className="glass-card p-3 flex items-center gap-3 hover:bg-glass-light/30 transition-all duration-300">
+              <span className="text-2xl">💹</span>
+              <div className="flex-1">
+                <div className="text-xs text-gray-500">今日盈亏</div>
+                <div className={`text-xl font-bold ${(performance.avg_daily_return || 0) >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {(performance.avg_daily_return || 0) >= 0 ? '+' : ''}{(performance.avg_daily_return || 0).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Main Content Grid */}

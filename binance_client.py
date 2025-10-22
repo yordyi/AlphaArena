@@ -75,11 +75,11 @@ class BinanceClient:
 
         try:
             if method == 'GET':
-                response = requests.get(url, params=params, headers=headers, timeout=10)
+                response = requests.get(url, params=params, headers=headers, timeout=30)
             elif method == 'POST':
-                response = requests.post(url, params=params, headers=headers, timeout=10)
+                response = requests.post(url, params=params, headers=headers, timeout=30)
             elif method == 'DELETE':
-                response = requests.delete(url, params=params, headers=headers, timeout=10)
+                response = requests.delete(url, params=params, headers=headers, timeout=30)
             else:
                 raise ValueError(f"不支持的HTTP方法: {method}")
 

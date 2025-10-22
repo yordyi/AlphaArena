@@ -4,25 +4,76 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alpha Arena - DeepSeek-V3 AI Trading</title>
+
+    <!-- PWA Support -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#00D9FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Alpha Arena">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #00D9FF;
-            --secondary: #7B61FF;
-            --accent: #FF00E5;
-            --success: #00FFA3;
-            --danger: #FF0080;
-            --warning: #FFB800;
+            /* ===== 主色系 - 降低饱和度70% (专业级) ===== */
+            --primary: #2DD4BF;        /* Teal-400 - 专业且科技感 */
+            --secondary: #8B7FD8;      /* 柔和紫 - 优雅沉稳 */
+            --accent: #E879F9;         /* 粉紫 - 点缀色 */
+
+            /* ===== 语义色 - Tailwind标准 ===== */
+            --success: #34D399;        /* Emerald-400 - 成功/盈利 */
+            --danger: #F87171;         /* Red-400 - 危险/亏损 */
+            --warning: #FBBF24;        /* Amber-400 - 警告 */
+            --info: #60A5FA;           /* Blue-400 - 信息 */
+
+            /* ===== 背景色 ===== */
             --bg-dark: #0A0A0F;
             --bg-darker: #050508;
             --glass: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.08);
+
+            /* ===== 文本色 ===== */
             --text-primary: #FFFFFF;
-            --text-secondary: #A0A0B8;
-            --glow-primary: rgba(0, 217, 255, 0.3);
-            --glow-secondary: rgba(123, 97, 255, 0.3);
+            --text-secondary: #A8B0C8;  /* 提高对比度 */
+
+            /* ===== 发光效果 - 微妙化 ===== */
+            --glow-primary: rgba(45, 212, 191, 0.2);
+            --glow-secondary: rgba(139, 127, 216, 0.2);
+
+            /* ===== 圆角系统 (统一标准) ===== */
+            --radius-sm: 0.25rem;   /* 4px - 小元素 */
+            --radius-md: 0.5rem;    /* 8px - 按钮 */
+            --radius-lg: 0.75rem;   /* 12px - 卡片 (主要使用) */
+            --radius-xl: 1rem;      /* 16px - 大容器 */
+            --radius-2xl: 1.5rem;   /* 24px - 极大容器 */
+            --radius-full: 9999px;  /* 圆形 - 徽章、头像 */
+
+            /* ===== 间距系统 (8px基准) ===== */
+            --space-1: 0.25rem;   /* 4px */
+            --space-2: 0.5rem;    /* 8px */
+            --space-3: 0.75rem;   /* 12px */
+            --space-4: 1rem;      /* 16px */
+            --space-5: 1.25rem;   /* 20px */
+            --space-6: 1.5rem;    /* 24px */
+            --space-8: 2rem;      /* 32px */
+            --space-10: 2.5rem;   /* 40px */
+            --space-12: 3rem;     /* 48px */
+
+            /* ===== 阴影系统 (微妙分层) ===== */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                         0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                         0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                         0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+            /* ===== 过渡动画 ===== */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         * {
@@ -79,35 +130,35 @@
         .container {
             max-width: 1600px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 1.5rem 2rem;
         }
 
-        /* Header */
+        /* Header - 紧凑版 */
         .header {
             text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 1.5rem;
             position: relative;
         }
 
         .header h1 {
-            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
             font-weight: 800;
             background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
             letter-spacing: -0.02em;
             animation: headerGlow 3s ease-in-out infinite;
         }
 
         @keyframes headerGlow {
-            0%, 100% { filter: drop-shadow(0 0 20px var(--glow-primary)); }
-            50% { filter: drop-shadow(0 0 30px var(--glow-secondary)); }
+            0%, 100% { filter: drop-shadow(0 0 15px var(--glow-primary)); }
+            50% { filter: drop-shadow(0 0 20px var(--glow-secondary)); }
         }
 
         .header .subtitle {
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             color: var(--text-secondary);
             font-weight: 500;
             letter-spacing: 0.05em;
@@ -116,14 +167,14 @@
         .header .ai-badge {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: var(--space-2);
             background: var(--glass);
             border: 1px solid var(--glass-border);
             backdrop-filter: blur(10px);
-            padding: 0.5rem 1rem;
-            border-radius: 50px;
-            margin-top: 1rem;
-            font-size: 0.9rem;
+            padding: var(--space-2) var(--space-4);  /* 8px 16px */
+            border-radius: var(--radius-full);        /* 胶囊形 */
+            margin-top: var(--space-3);
+            font-size: 0.75rem;
             font-weight: 600;
         }
 
@@ -141,23 +192,42 @@
             50% { opacity: 0.6; transform: scale(1.2); }
         }
 
-        /* Stats Grid */
+        /* Stats Grid - 超紧凑4列布局 */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
             margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1400px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .stat-card {
             background: var(--glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 1.5rem;
+            border-radius: var(--radius-lg);  /* 12px 统一标准 */
+            padding: var(--space-4);          /* 16px 标准间距 */
             position: relative;
             overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: var(--transition-slow);
+            box-shadow: var(--shadow-sm);    /* 微妙阴影 */
         }
 
         .stat-card::before {
@@ -177,29 +247,29 @@
         }
 
         .stat-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-2px);
             border-color: var(--primary);
-            box-shadow: 0 20px 60px rgba(0, 217, 255, 0.2);
+            box-shadow: var(--shadow-md);  /* 微妙提升，不过度 */
         }
 
         .stat-card h3 {
-            font-size: 0.85rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.75rem;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.4rem;
         }
 
         .stat-card .value {
-            font-size: 2.5rem;
+            font-size: 1.5rem;
             font-weight: 800;
             font-family: 'JetBrains Mono', monospace;
             background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            line-height: 1.2;
+            line-height: 1.1;
         }
 
         .stat-card .value.positive {
@@ -221,17 +291,18 @@
             background: var(--glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: var(--radius-xl);   /* 16px */
+            padding: var(--space-8);           /* 32px */
+            margin-bottom: var(--space-8);
             position: relative;
             overflow: hidden;
+            box-shadow: var(--shadow-sm);
         }
 
         .positions-container h2 {
             font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 1.5rem;
+            margin-bottom: var(--space-6);     /* 24px */
             color: var(--text-primary);
         }
 
@@ -358,17 +429,18 @@
             background: var(--glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
+            border-radius: var(--radius-xl);   /* 16px */
+            padding: var(--space-8);           /* 32px */
+            margin-bottom: var(--space-8);
             position: relative;
             overflow: hidden;
+            box-shadow: var(--shadow-sm);
         }
 
         .chart-container h2 {
             font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 1.5rem;
+            margin-bottom: var(--space-6);     /* 24px */
             color: var(--text-primary);
         }
 
@@ -377,15 +449,16 @@
             background: var(--glass);
             backdrop-filter: blur(20px);
             border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 2rem;
+            border-radius: var(--radius-xl);   /* 16px */
+            padding: var(--space-8);           /* 32px */
             overflow: hidden;
+            box-shadow: var(--shadow-sm);
         }
 
         .trades-container h2 {
             font-size: 1.5rem;
             font-weight: 700;
-            margin-bottom: 1.5rem;
+            margin-bottom: var(--space-6);     /* 24px */
             color: var(--text-primary);
         }
 
@@ -519,15 +592,14 @@
             border: 1px solid var(--glass-border);
             border-radius: 12px;
             padding: 1.25rem;
-            margin-bottom: 1rem;
             transition: all 0.3s ease;
-            border-left: 4px solid var(--primary);
+            position: relative;
         }
 
         .decision-card:hover {
             background: rgba(255, 255, 255, 0.05);
-            border-left-color: var(--success);
-            transform: translateX(4px);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
         }
 
         .decision-header {
@@ -607,6 +679,137 @@
             margin-top: 0.75rem;
         }
 
+        /* 两栏布局 */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            margin-top: 0;
+            align-items: start;  /* 确保顶部对齐 */
+        }
+
+        .content-left {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .content-right {
+            position: sticky;
+            top: 0;  /* 从顶部开始 */
+            height: fit-content;
+            max-height: 100vh;
+            overflow-y: auto;
+        }
+
+        /* AI决策容器（悬浮卡片样式） */
+        .decisions-sidebar {
+            background: rgba(30, 30, 40, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .decisions-sidebar h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 0 0 1.5rem 0;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* AI决策容器 */
+        #decisions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        /* 时间线连接线 */
+        .decision-card {
+            position: relative;
+        }
+
+        .decision-card::before {
+            content: '';
+            position: absolute;
+            left: -20px;
+            top: 0;
+            bottom: -1.5rem;
+            width: 2px;
+            background: linear-gradient(180deg, var(--primary), var(--secondary));
+            opacity: 0.3;
+        }
+
+        .decision-card:last-child::before {
+            bottom: 0;
+        }
+
+        /* 时间线节点 */
+        .decision-card::after {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 1.5rem;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 12px var(--glow-primary);
+            border: 3px solid rgba(10, 10, 15, 0.95);
+        }
+
+        /* 推理模型节点颜色 */
+        .decision-card[data-model="reasoner"]::after {
+            background: #7B61FF;
+            box-shadow: 0 0 12px rgba(123, 97, 255, 0.6);
+        }
+
+        .decision-card[data-model="reasoner"]::before {
+            background: linear-gradient(180deg, #7B61FF, #9B7FFF);
+        }
+
+        /* 日常模型节点颜色 */
+        .decision-card[data-model="chat"]::after {
+            background: #00D9FF;
+            box-shadow: 0 0 12px rgba(0, 217, 255, 0.6);
+        }
+
+        .decision-card[data-model="chat"]::before {
+            background: linear-gradient(180deg, #00D9FF, #00BFFF);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1400px) {
+            .main-content {
+                grid-template-columns: 1fr 350px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .content-right {
+                position: relative;
+                max-height: none;
+            }
+
+            .decision-card::before,
+            .decision-card::after {
+                display: none;
+            }
+        }
+
         /* Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
@@ -638,99 +841,108 @@
             </div>
         </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>💰 账户价值</h3>
-                <div class="value" id="account-value">$0</div>
-            </div>
+        <!-- 两栏布局（包含性能指标和AI决策） -->
+        <div class="main-content">
+            <!-- 左侧内容 -->
+            <div class="content-left">
+                <!-- 性能指标卡片 - 与持仓卡片宽度对齐 -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>💰 账户价值</h3>
+                        <div class="value" id="account-value">$0</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>📈 总回报率</h3>
-                <div class="value" id="total-return">0%</div>
-            </div>
+                    <div class="stat-card">
+                        <h3>📈 总回报率</h3>
+                        <div class="value" id="total-return">0%</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>📊 夏普比率</h3>
-                <div class="value" id="sharpe-ratio">0.00</div>
-            </div>
+                    <div class="stat-card">
+                        <h3>📊 夏普比率</h3>
+                        <div class="value" id="sharpe-ratio">0.00</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>📉 最大回撤</h3>
-                <div class="value negative" id="max-drawdown">0%</div>
-            </div>
+                    <div class="stat-card">
+                        <h3>📉 最大回撤</h3>
+                        <div class="value negative" id="max-drawdown">0%</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>🎯 胜率</h3>
-                <div class="value" id="win-rate">0%</div>
-            </div>
+                    <div class="stat-card">
+                        <h3>🎯 胜率</h3>
+                        <div class="value" id="win-rate">0%</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>🔢 总交易笔数</h3>
-                <div class="value" id="total-trades">0</div>
-            </div>
+                    <div class="stat-card">
+                        <h3>🔢 总交易笔数</h3>
+                        <div class="value" id="total-trades">0</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>📍 持仓数量</h3>
-                <div class="value" id="open-positions">0</div>
-            </div>
+                    <div class="stat-card">
+                        <h3>📍 持仓数量</h3>
+                        <div class="value" id="open-positions">0</div>
+                    </div>
 
-            <div class="stat-card">
-                <h3>💵 未实现盈亏</h3>
-                <div class="value" id="unrealized-pnl">$0</div>
-            </div>
-        </div>
+                    <div class="stat-card">
+                        <h3>💵 未实现盈亏</h3>
+                        <div class="value" id="unrealized-pnl">$0</div>
+                    </div>
+                </div>
+                <!-- 当前持仓 -->
+                <div class="positions-container">
+                    <h2>📍 当前持仓</h2>
+                    <div id="positions-grid" class="positions-grid">
+                        <div class="loading">正在加载持仓信息...</div>
+                    </div>
+                </div>
 
-        <!-- 当前持仓 -->
-        <div class="positions-container">
-            <h2>📍 当前持仓</h2>
-            <div id="positions-grid" class="positions-grid">
-                <div class="loading">正在加载持仓信息...</div>
-            </div>
-        </div>
+                <div class="chart-container">
+                    <h2>📈 账户价值曲线</h2>
+                    <div style="height: 400px; position: relative;">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
 
-        <div class="chart-container">
-            <h2>📈 账户价值曲线</h2>
-            <div style="height: 400px; position: relative;">
-                <canvas id="performanceChart"></canvas>
-            </div>
-        </div>
-
-        <div class="trades-container">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="margin: 0;">🔥 最近交易记录</h2>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <button id="prev-page" style="padding: 6px 12px; background: rgba(0, 217, 255, 0.15); border: 1px solid var(--primary); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">← 上一页</button>
-                    <span id="page-info" style="color: var(--text-secondary); font-size: 0.9rem;">第 1 页</span>
-                    <button id="next-page" style="padding: 6px 12px; background: rgba(0, 217, 255, 0.15); border: 1px solid var(--primary); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">下一页 →</button>
+                <div class="trades-container">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2 style="margin: 0;">🔥 最近交易记录</h2>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button id="prev-page" style="padding: 6px 12px; background: rgba(0, 217, 255, 0.15); border: 1px solid var(--primary); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">← 上一页</button>
+                            <span id="page-info" style="color: var(--text-secondary); font-size: 0.9rem;">第 1 页</span>
+                            <button id="next-page" style="padding: 6px 12px; background: rgba(0, 217, 255, 0.15); border: 1px solid var(--primary); color: var(--primary); border-radius: 6px; cursor: pointer; font-size: 0.9rem;">下一页 →</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>交易对</th>
+                                    <th>操作</th>
+                                    <th>数量</th>
+                                    <th>价格</th>
+                                    <th>杠杆</th>
+                                    <th>信心度</th>
+                                    <th>盈亏</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trades-tbody">
+                                <tr>
+                                    <td colspan="8" class="loading">正在初始化AI交易系统...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>交易对</th>
-                            <th>操作</th>
-                            <th>数量</th>
-                            <th>价格</th>
-                            <th>杠杆</th>
-                            <th>信心度</th>
-                            <th>盈亏</th>
-                        </tr>
-                    </thead>
-                    <tbody id="trades-tbody">
-                        <tr>
-                            <td colspan="8" class="loading">正在初始化AI交易系统...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
-        <div class="trades-container" style="margin-top: 2rem;">
-            <h2>🤖 AI实时决策日志</h2>
-            <div id="decisions-container">
-                <div class="loading">正在加载AI决策...</div>
+            <!-- 右侧AI决策 -->
+            <div class="content-right">
+                <div class="decisions-sidebar">
+                    <h2>🤖 AI实时决策</h2>
+                    <div id="decisions-container">
+                        <div class="loading">正在加载AI决策...</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -742,9 +954,217 @@
         </div>
     </div>
 
+    <!-- Socket.IO 客户端库 -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
+        // ==================== 数据状态管理系统 ====================
+        const AppState = {
+            // 性能数据
+            performance: {
+                account_value: 0,
+                wallet_balance: 0,
+                total_return_pct: 0,
+                sharpe_ratio: 0,
+                max_drawdown_pct: 0,
+                win_rate_pct: 0,
+                total_trades: 0,
+                open_positions: 0,
+                unrealized_pnl: 0,
+                realized_pnl: 0,
+                timestamp: null
+            },
+
+            // 持仓数据
+            positions: [],
+
+            // AI决策数据
+            decisions: [],
+
+            // 交易记录
+            trades: [],
+
+            // 图表数据
+            chartData: [],
+
+            // 更新性能数据
+            updatePerformance(data) {
+                this.performance = { ...this.performance, ...data };
+                this.performance.timestamp = Date.now();
+            },
+
+            // 更新持仓
+            updatePositions(positions) {
+                this.positions = positions || [];
+            },
+
+            // 更新决策（带时间过滤）
+            updateDecisions(decisions) {
+                if (!decisions) {
+                    this.decisions = [];
+                    return;
+                }
+
+                const now = new Date();
+                const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+
+                // 过滤最近2分钟的决策
+                this.decisions = decisions.filter(decision => {
+                    if (!decision.time) return false;
+                    try {
+                        const decisionTime = new Date(decision.time.replace(',', '.'));
+                        return decisionTime >= twoMinutesAgo;
+                    } catch (e) {
+                        return true;
+                    }
+                }).sort((a, b) => {
+                    // 按时间倒序排列
+                    try {
+                        const timeA = new Date(a.time.replace(',', '.'));
+                        const timeB = new Date(b.time.replace(',', '.'));
+                        return timeB - timeA;
+                    } catch (e) {
+                        return 0;
+                    }
+                });
+            },
+
+            // 更新交易记录
+            updateTrades(trades) {
+                this.trades = trades || [];
+            },
+
+            // 更新图表数据
+            updateChartData(data) {
+                this.chartData = data || [];
+            },
+
+            // 获取状态快照
+            getSnapshot() {
+                return {
+                    performance: { ...this.performance },
+                    positions: [...this.positions],
+                    decisions: [...this.decisions],
+                    trades: [...this.trades],
+                    chartData: [...this.chartData]
+                };
+            }
+        };
+
+        // ==================== 全局变量 ====================
         let chart = null;
+        let previousValues = {};  // 存储上一次的值，用于动画对比
+        let previousPrices = {};  // 存储上一次的价格，用于箭头显示
+        let socket = null;  // WebSocket 连接
+
+        // 🔊 音效系统
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playProfitSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 880; // A5
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+
+        function playLossSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 220; // A3
+            oscillator.type = 'sawtooth';
+
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.4);
+        }
+
+        // 🎯 数字跳动动画函数
+        function animateNumber(element, targetValue, options = {}) {
+            const {
+                duration = 800,         // 动画持续时间（毫秒）
+                decimals = 2,           // 小数位数
+                prefix = '',            // 前缀（如$）
+                suffix = '',            // 后缀（如%）
+                useLocale = false,      // 是否使用千分位
+                className = '',         // CSS类名
+                isPercentage = false    // 是否是百分比
+            } = options;
+
+            const elementId = element.id;
+            const currentValue = previousValues[elementId] || 0;
+
+            // 如果值没有变化，直接返回
+            if (currentValue === targetValue) return;
+
+            const startValue = parseFloat(currentValue) || 0;
+            const endValue = parseFloat(targetValue) || 0;
+            const diff = endValue - startValue;
+            const startTime = performance.now();
+
+            // 添加闪烁效果
+            element.style.transition = 'all 0.2s ease';
+            element.style.transform = 'scale(1.05)';
+
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 150);
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // 使用 easeOutCubic 缓动函数
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = startValue + (diff * eased);
+
+                let displayValue;
+                if (useLocale) {
+                    displayValue = current.toLocaleString('en-US', {
+                        minimumFractionDigits: decimals,
+                        maximumFractionDigits: decimals
+                    });
+                } else {
+                    displayValue = current.toFixed(decimals);
+                }
+
+                // 添加正负号（针对百分比和盈亏）
+                if (isPercentage && current > 0) {
+                    displayValue = '+' + displayValue;
+                }
+
+                element.textContent = prefix + displayValue + suffix;
+
+                // 更新CSS类名
+                if (className) {
+                    element.className = className;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    // 保存最终值
+                    previousValues[elementId] = endValue;
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
 
         // Update performance metrics
         function updatePerformance() {
@@ -754,40 +1174,64 @@
                     if (result.success) {
                         const data = result.data;
 
+                        // 🎯 使用动画更新所有数字
+
                         // Account Value
-                        document.getElementById('account-value').textContent =
-                            '$' + data.account_value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        animateNumber(document.getElementById('account-value'), data.account_value, {
+                            prefix: '$',
+                            useLocale: true,
+                            decimals: 2
+                        });
 
                         // Total Return
                         const returnElem = document.getElementById('total-return');
                         const returnValue = data.total_return_pct;
-                        returnElem.textContent = (returnValue >= 0 ? '+' : '') + returnValue.toFixed(2) + '%';
-                        returnElem.className = 'value ' + (returnValue >= 0 ? 'positive' : 'negative');
+                        animateNumber(returnElem, returnValue, {
+                            suffix: '%',
+                            decimals: 2,
+                            isPercentage: true,
+                            className: 'value ' + (returnValue >= 0 ? 'positive' : 'negative')
+                        });
 
                         // Sharpe Ratio
                         const sharpeElem = document.getElementById('sharpe-ratio');
-                        sharpeElem.textContent = data.sharpe_ratio.toFixed(2);
-                        sharpeElem.className = 'value ' + (data.sharpe_ratio >= 1 ? 'positive' : '');
+                        animateNumber(sharpeElem, data.sharpe_ratio, {
+                            decimals: 2,
+                            className: 'value ' + (data.sharpe_ratio >= 1 ? 'positive' : '')
+                        });
 
                         // Max Drawdown
-                        document.getElementById('max-drawdown').textContent =
-                            data.max_drawdown_pct.toFixed(2) + '%';
+                        animateNumber(document.getElementById('max-drawdown'), data.max_drawdown_pct, {
+                            suffix: '%',
+                            decimals: 2
+                        });
 
                         // Win Rate
                         const winRateElem = document.getElementById('win-rate');
-                        winRateElem.textContent = data.win_rate_pct.toFixed(2) + '%';
-                        winRateElem.className = 'value ' + (data.win_rate_pct >= 50 ? 'positive' : '');
+                        animateNumber(winRateElem, data.win_rate_pct, {
+                            suffix: '%',
+                            decimals: 2,
+                            className: 'value ' + (data.win_rate_pct >= 50 ? 'positive' : '')
+                        });
 
                         // Total Trades
-                        document.getElementById('total-trades').textContent = data.total_trades;
+                        animateNumber(document.getElementById('total-trades'), data.total_trades, {
+                            decimals: 0
+                        });
 
                         // Open Positions
-                        document.getElementById('open-positions').textContent = data.open_positions;
+                        animateNumber(document.getElementById('open-positions'), data.open_positions, {
+                            decimals: 0
+                        });
 
                         // Unrealized P&L
                         const pnlElem = document.getElementById('unrealized-pnl');
-                        pnlElem.textContent = '$' + data.unrealized_pnl.toFixed(2);
-                        pnlElem.className = 'value ' + (data.unrealized_pnl >= 0 ? 'positive' : 'negative');
+                        animateNumber(pnlElem, data.unrealized_pnl, {
+                            prefix: '$',
+                            decimals: 2,
+                            isPercentage: true,
+                            className: 'value ' + (data.unrealized_pnl >= 0 ? 'positive' : 'negative')
+                        });
 
                         // Last Update
                         document.getElementById('last-update').textContent =
@@ -881,6 +1325,7 @@
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
+                                animation: false,  // 禁用动画，避免图表跳动
                                 interaction: {
                                     intersect: false,
                                     mode: 'index'
@@ -962,7 +1407,7 @@
 
         // Trades pagination
         let currentPage = 1;
-        const tradesPerPage = 20;
+        const tradesPerPage = 10;  // 每页显示10条交易记录
         let allTrades = [];
 
         // Update trades table
@@ -1060,11 +1505,13 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {
-                        const decisions = result.data;
+                        // 使用状态管理系统更新决策（自动过滤和排序）
+                        AppState.updateDecisions(result.data);
+                        const decisions = AppState.decisions;
                         const container = document.getElementById('decisions-container');
 
                         if (decisions.length === 0) {
-                            container.innerHTML = '<div class="loading">暂无AI决策记录...</div>';
+                            container.innerHTML = '<div class="loading">最近2分钟无AI决策...</div>';
                             return;
                         }
 
@@ -1080,28 +1527,47 @@
                                 actionClass = 'close';
                             }
 
-                            // 提取模型类型和推理过程
-                            const modelBadge = decision.model_used === 'deepseek-reasoner'
-                                ? '<span style="background: rgba(123, 97, 255, 0.2); color: #7B61FF; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">🧠 Reasoner</span>'
-                                : '<span style="background: rgba(0, 217, 255, 0.2); color: #00D9FF; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">💬 Chat</span>';
+                            // 判断是否是推理模型
+                            const isReasonerModel = decision.model_used === 'deepseek-reasoner' ||
+                                                    decision.reasoning_content;
 
-                            const reasoningSection = decision.reasoning_content
-                                ? `<div style="margin-top: 8px; padding: 8px; background: rgba(123, 97, 255, 0.1); border-left: 3px solid #7B61FF; border-radius: 4px; font-size: 0.85rem; color: #A0A0B8;">
-                                    🧠 <strong>推理过程:</strong> ${decision.reasoning_content}
+                            // 卡片背景和边框颜色
+                            const cardStyle = isReasonerModel
+                                ? 'background: linear-gradient(135deg, rgba(123, 97, 255, 0.15), rgba(123, 97, 255, 0.05)); border: 1px solid rgba(123, 97, 255, 0.4); box-shadow: 0 4px 16px rgba(123, 97, 255, 0.2);'
+                                : 'background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(0, 217, 255, 0.03)); border: 1px solid rgba(0, 217, 255, 0.3); box-shadow: 0 4px 16px rgba(0, 217, 255, 0.15);';
+
+                            // 模型徽章
+                            const modelBadge = isReasonerModel
+                                ? '<span style="background: linear-gradient(135deg, #7B61FF, #9B7FFF); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 2px 8px rgba(123, 97, 255, 0.4);">🧠 REASONER</span>'
+                                : '<span style="background: linear-gradient(135deg, #00D9FF, #00BFFF); color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 2px 8px rgba(0, 217, 255, 0.4);">💬 CHAT</span>';
+
+                            // 推理过程部分（仅推理模型显示）
+                            const reasoningSection = decision.reasoning_content && isReasonerModel
+                                ? `<div style="margin-top: 12px; padding: 12px; background: rgba(123, 97, 255, 0.15); border-left: 3px solid #7B61FF; border-radius: 6px; font-size: 0.85rem; color: #C0C0D8; line-height: 1.5;">
+                                    <div style="font-weight: 700; color: #9B7FFF; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                                        <span>🧠</span>
+                                        <span>深度推理过程</span>
+                                    </div>
+                                    <div style="font-size: 0.8rem; line-height: 1.6;">
+                                        ${decision.reasoning_content}
+                                    </div>
                                 </div>`
                                 : '';
 
                             return `
-                                <div class="decision-card">
-                                    <div class="decision-header">
-                                        <span class="decision-symbol">${decision.symbol}${modelBadge}</span>
-                                        <span class="decision-time">${decision.time}</span>
+                                <div class="decision-card" data-model="${isReasonerModel ? 'reasoner' : 'chat'}" style="${cardStyle}">
+                                    <div class="decision-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                                            <span class="decision-symbol" style="font-size: 1.1rem; font-weight: 700; color: ${isReasonerModel ? '#9B7FFF' : '#00D9FF'};">${decision.symbol}</span>
+                                            ${modelBadge}
+                                        </div>
+                                        <span class="decision-time" style="font-size: 0.75rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;">${decision.time}</span>
                                     </div>
-                                    <div class="decision-action">
-                                        <span class="action-badge ${actionClass}">${actionText}</span>
-                                        <span class="decision-confidence">信心度: ${decision.confidence}</span>
+                                    <div class="decision-action" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <span class="action-badge ${actionClass}" style="padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 0.9rem;">${actionText}</span>
+                                        <span class="decision-confidence" style="font-size: 0.85rem; font-weight: 600; color: ${isReasonerModel ? '#9B7FFF' : '#00D9FF'};">信心度: ${decision.confidence}</span>
                                     </div>
-                                    <div class="decision-reasoning">
+                                    <div class="decision-reasoning" style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; padding: 10px; background: rgba(255, 255, 255, 0.03); border-radius: 6px;">
                                         💡 ${decision.reasoning}
                                     </div>
                                     ${reasoningSection}
@@ -1172,26 +1638,204 @@
                 .catch(error => console.error('Positions update error:', error));
         }
 
-        // Initial load
-        updatePerformance();
+        // ==================== WebSocket 实时连接 ====================
+
+        // 建立 WebSocket 连接
+        socket = io();
+
+        socket.on('connect', function() {
+            console.log('%c⚡ WebSocket 已连接', 'font-size: 14px; font-weight: bold; color: #00FFA3;');
+            console.log('%c⚡ 延迟 <100ms 实时推送已启用', 'font-size: 12px; color: #00D9FF;');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('%c❌ WebSocket 已断开，尝试重连...', 'font-size: 12px; color: #FF6B6B;');
+        });
+
+        // 监听性能数据推送（每500ms）
+        socket.on('performance_update', function(result) {
+            if (result.success) {
+                const data = result.data;
+                const prevPnl = previousValues['unrealized-pnl'] || 0;
+
+                // 🎯 使用动画更新所有数字
+                animateNumber(document.getElementById('account-value'), data.account_value, {
+                    prefix: '$',
+                    useLocale: true,
+                    decimals: 2
+                });
+
+                const returnElem = document.getElementById('total-return');
+                const returnValue = data.total_return_pct;
+                animateNumber(returnElem, returnValue, {
+                    suffix: '%',
+                    decimals: 2,
+                    isPercentage: true,
+                    className: 'value ' + (returnValue >= 0 ? 'positive' : 'negative')
+                });
+
+                const sharpeElem = document.getElementById('sharpe-ratio');
+                animateNumber(sharpeElem, data.sharpe_ratio, {
+                    decimals: 2,
+                    className: 'value ' + (data.sharpe_ratio >= 1 ? 'positive' : '')
+                });
+
+                animateNumber(document.getElementById('max-drawdown'), data.max_drawdown_pct, {
+                    suffix: '%',
+                    decimals: 2
+                });
+
+                const winRateElem = document.getElementById('win-rate');
+                animateNumber(winRateElem, data.win_rate_pct, {
+                    suffix: '%',
+                    decimals: 2,
+                    className: 'value ' + (data.win_rate_pct >= 50 ? 'positive' : '')
+                });
+
+                animateNumber(document.getElementById('total-trades'), data.total_trades, {
+                    decimals: 0
+                });
+
+                animateNumber(document.getElementById('open-positions'), data.open_positions, {
+                    decimals: 0
+                });
+
+                const pnlElem = document.getElementById('unrealized-pnl');
+                animateNumber(pnlElem, data.unrealized_pnl, {
+                    prefix: '$',
+                    decimals: 2,
+                    isPercentage: true,
+                    className: 'value ' + (data.unrealized_pnl >= 0 ? 'positive' : 'negative')
+                });
+
+                // 🔊 音效提醒：盈亏变化超过$5时播放
+                if (Math.abs(data.unrealized_pnl - prevPnl) > 5) {
+                    if (data.unrealized_pnl > prevPnl) {
+                        playProfitSound();
+                    } else if (data.unrealized_pnl < prevPnl) {
+                        playLossSound();
+                    }
+                }
+
+                document.getElementById('last-update').textContent = new Date().toLocaleString('zh-CN', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+        });
+
+        // 监听持仓数据推送（每500ms）+ 价格箭头显示
+        socket.on('positions_update', function(result) {
+            if (result.success) {
+                const positions = result.data;
+                const grid = document.getElementById('positions-grid');
+
+                if (positions.length === 0) {
+                    grid.innerHTML = '<div class="no-positions">暂无持仓 🌙</div>';
+                    return;
+                }
+
+                grid.innerHTML = positions.map(pos => {
+                    const pnlClass = pos.pnl_pct >= 0 ? 'positive' : 'negative';
+                    const pnlSign = pos.pnl_pct >= 0 ? '+' : '';
+                    const sideClass = pos.side === 'LONG' ? 'long' : 'short';
+
+                    // 🎯 价格箭头显示
+                    const prevPrice = previousPrices[pos.symbol] || pos.current_price;
+                    let priceArrow = '';
+                    let priceChangeClass = '';
+
+                    if (pos.current_price > prevPrice) {
+                        priceArrow = ' <span style="color: var(--success); font-size: 0.9rem;">▲</span>';
+                        priceChangeClass = 'price-up';
+                    } else if (pos.current_price < prevPrice) {
+                        priceArrow = ' <span style="color: var(--danger); font-size: 0.9rem;">▼</span>';
+                        priceChangeClass = 'price-down';
+                    }
+
+                    previousPrices[pos.symbol] = pos.current_price;
+
+                    return `
+                        <div class="position-card">
+                            <div class="position-header">
+                                <span class="position-symbol">${pos.symbol}</span>
+                                <span class="position-side ${sideClass}">${pos.side_cn}</span>
+                            </div>
+                            <div class="position-info">
+                                <div class="position-info-item">
+                                    <span class="position-info-label">数量</span>
+                                    <span class="position-info-value">${pos.quantity}</span>
+                                </div>
+                                <div class="position-info-item">
+                                    <span class="position-info-label">杠杆</span>
+                                    <span class="position-info-value">${pos.leverage}x</span>
+                                </div>
+                                <div class="position-info-item">
+                                    <span class="position-info-label">开仓价</span>
+                                    <span class="position-info-value">$${pos.entry_price.toFixed(2)}</span>
+                                </div>
+                                <div class="position-info-item">
+                                    <span class="position-info-label">当前价</span>
+                                    <span class="position-info-value ${priceChangeClass}">$${pos.current_price.toFixed(2)}${priceArrow}</span>
+                                </div>
+                            </div>
+                            <div class="position-pnl ${pnlClass}">
+                                <div class="position-pnl-value">
+                                    ${pnlSign}$${Math.abs(pos.pnl_usd).toFixed(2)}
+                                </div>
+                                <div class="position-pnl-pct">
+                                    ${pnlSign}${pos.pnl_pct.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        });
+
+        // Initial load (REST API fallback)
         updateChart();
         updateTrades();
         updateDecisions();
-        updatePositions();
 
-        // Auto refresh every 2 seconds (毫秒级实时更新)
+        // 图表每10秒更新一次，避免频繁跳动
         setInterval(() => {
-            updatePerformance();
             updateChart();
+        }, 10000);
+
+        // 交易记录每5秒更新
+        setInterval(() => {
             updateTrades();
+        }, 5000);
+
+        // AI决策每2分钟更新一次（与交易机器人决策频率一致）
+        setInterval(() => {
             updateDecisions();
-            updatePositions();
-        }, 2000);
+        }, 2 * 60 * 1000);  // 120秒 = 2分钟
 
         // Show connection status
         console.log('%c⚡ ALPHA ARENA DASHBOARD', 'font-size: 20px; font-weight: bold; color: #00D9FF;');
         console.log('%cDeepSeek-V3 UltraThink AI Trading System', 'font-size: 14px; color: #7B61FF;');
-        console.log('%cConnected and monitoring...', 'font-size: 12px; color: #00FFA3;');
+        console.log('%cWebSocket 实时推送已启用 (延迟 <100ms)', 'font-size: 12px; color: #00FFA3;');
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(registration => {
+                        console.log('%c✅ Service Worker 已注册', 'color: #00FFA3;', registration);
+                        console.log('%c📱 可在移动设备上"添加到主屏幕"安装应用', 'color: #00D9FF;');
+                    })
+                    .catch(error => {
+                        console.log('%c❌ Service Worker 注册失败:', 'color: #FF0080;', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>

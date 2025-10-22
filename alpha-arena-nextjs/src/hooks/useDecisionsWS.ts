@@ -11,10 +11,13 @@ export function useDecisionsWS() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
 
   useEffect(() => {
+    // 浏览器环境检查
+    if (typeof window === 'undefined') return
+
     const socket = getSocket()
 
-    // 初始数据获取
-    const fetchInitialData = async () => {
+    // 数据获取函数
+    const fetchData = async () => {
       try {
         const response = await fetch('/api/decisions')
         const result = await response.json()
@@ -24,7 +27,7 @@ export function useDecisionsWS() {
           setError(null)
           setLastUpdate(new Date())
         } else {
-          setError('Failed to fetch initial AI decisions')
+          setError('Failed to fetch AI decisions')
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
@@ -33,9 +36,9 @@ export function useDecisionsWS() {
       }
     }
 
-    fetchInitialData()
+    fetchData()
 
-    // 监听WebSocket实时更新
+    // 监听WebSocket实时更新（作为备选）
     socket.on('decisions_update', (newData: AIDecision[]) => {
       console.log('🤖 AI Decisions update received via WebSocket')
       setData(newData)
@@ -51,10 +54,16 @@ export function useDecisionsWS() {
       setLastUpdate(new Date())
     })
 
+    // 同时使用定时轮询作为fallback（每5秒刷新，决策更新频率较低）
+    const pollingInterval = setInterval(() => {
+      fetchData()
+    }, 5000)
+
     // 清理
     return () => {
       socket.off('decisions_update')
       socket.off('new_decision')
+      clearInterval(pollingInterval)
     }
   }, [])
 

@@ -101,9 +101,9 @@ class AlphaArenaBot:
         risk_config = {
             'max_portfolio_risk': 0.02,
             'max_position_size': self.max_position_pct / 100,
-            'max_leverage': 15,  # 降低到15倍（从原来的default_leverage）
-            'default_stop_loss_pct': 0.03,  # 提高到3%（从2%），给予更大容忍空间
-            'default_take_profit_pct': 0.09,  # 提高到9%（从4%），1:3盈亏比
+            'max_leverage': 20,  # 统一为20倍，与AI决策范围一致
+            'default_stop_loss_pct': 0.015,  # 1.5%止损，与交易策略一致
+            'default_take_profit_pct': 0.05,  # 5%止盈
             'max_drawdown': 0.15,
             'max_daily_loss': 0.05,
             'max_open_positions': 10,
@@ -321,7 +321,7 @@ class AlphaArenaBot:
             self.logger.error(f"处理 {symbol} 失败: {e}")
 
     def _save_ai_decision(self, symbol: str, decision: dict, trade_result: dict):
-        """保存AI决策到文件"""
+        """保存增强的AI决策卡片到文件"""
         import json
         try:
             # 读取现有决策
@@ -331,20 +331,83 @@ class AlphaArenaBot:
             except FileNotFoundError:
                 decisions = []
 
-            # 添加新决策（包含所有DeepSeek参数）
+            # 获取当前账户状态
+            try:
+                balance = self.binance.get_futures_usdt_balance()
+                positions = self.binance.get_active_positions()
+                unrealized_pnl = sum(float(pos.get('unRealizedProfit', 0)) for pos in positions)
+                total_value = balance + unrealized_pnl
+                metrics = self.performance.calculate_metrics(balance, positions)
+            except Exception:
+                balance = 0
+                total_value = 0
+                metrics = {'total_return_pct': 0}
+                positions = []
+
+            # 获取交易时段信息
+            from deepseek_client import DeepSeekClient
+            temp_client = DeepSeekClient(self.deepseek_api_key)
+            session_info = temp_client.get_trading_session()
+
+            # 构建增强的决策记录
             decision_record = {
                 'timestamp': datetime.now().isoformat(),
-                'symbol': symbol,
-                'action': decision.get('action', 'HOLD'),
-                'confidence': decision.get('confidence', 0),
-                'reasoning': decision.get('reasoning', ''),
-                'leverage': decision.get('leverage', 3),
-                'position_size': decision.get('position_size', 5),
-                'stop_loss_pct': decision.get('stop_loss_pct', 2),
-                'take_profit_pct': decision.get('take_profit_pct', 4),
-                'executed': trade_result.get('success', False),
-                'error': trade_result.get('error', None)
+                'cycle': len(decisions) + 1,
+
+                # 📊 账户快照
+                'account_snapshot': {
+                    'total_value': round(total_value, 2),
+                    'cash_balance': round(balance, 2),
+                    'total_return_pct': round(metrics.get('total_return_pct', 0), 2),
+                    'positions_count': len(positions),
+                    'unrealized_pnl': round(unrealized_pnl, 2)
+                },
+
+                # 🎯 本次决策详情
+                'decision': {
+                    'symbol': symbol,
+                    'action': decision.get('action', 'HOLD'),
+                    'confidence': decision.get('confidence', 0),
+                    'reasoning': decision.get('reasoning', ''),
+                    'leverage': decision.get('leverage', 3),
+                    'position_size': decision.get('position_size', 5),
+                    'stop_loss_pct': decision.get('stop_loss_pct', 1.5),
+                    'take_profit_pct': decision.get('take_profit_pct', 5),
+                    'executed': trade_result.get('success', False),
+                    'error': trade_result.get('error', None)
+                },
+
+                # ⏰ 交易时段
+                'session_info': {
+                    'session': session_info['session'],
+                    'volatility': session_info['volatility'],
+                    'recommendation': session_info['recommendation'],
+                    'aggressive_mode': session_info['aggressive_mode']
+                },
+
+                # 💼 持仓快照（如果是持仓决策）
+                'position_snapshot': None
             }
+
+            # 如果是持仓评估，添加持仓详情
+            if decision.get('action') in ['HOLD', 'CLOSE']:
+                for pos in positions:
+                    if pos['symbol'] == symbol:
+                        entry_price = float(pos.get('entryPrice', 0))
+                        current_price = float(pos.get('markPrice', 0))
+                        pnl_pct = ((current_price - entry_price) / entry_price * 100 *
+                                  (-1 if float(pos.get('positionAmt', 0)) < 0 else 1))
+
+                        decision_record['position_snapshot'] = {
+                            'direction': 'SHORT' if float(pos.get('positionAmt', 0)) < 0 else 'LONG',
+                            'quantity': abs(float(pos.get('positionAmt', 0))),
+                            'leverage': int(pos.get('leverage', 1)),
+                            'entry_price': entry_price,
+                            'current_price': current_price,
+                            'unrealized_pnl': float(pos.get('unRealizedProfit', 0)),
+                            'unrealized_pnl_pct': round(pnl_pct, 2)
+                        }
+                        break
 
             decisions.append(decision_record)
 

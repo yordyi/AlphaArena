@@ -43,6 +43,12 @@ class AITradingEngine:
         self.trade_cooldown = {}
         self.cooldown_seconds = 900  # 15分钟冷却期
 
+        # 推理模型时间跟踪
+        # Chat模型: 每120秒分析（快速反应）
+        # Reasoner模型: 每300秒深度分析（重大决策）
+        self.last_reasoner_time = 0
+        self.reasoner_interval = 300  # 5分钟执行一次Reasoner
+
     def analyze_and_trade(self, symbol: str, max_position_pct: float = 10.0) -> Dict:
         """
         分析市场并执行交易
@@ -650,27 +656,33 @@ class AITradingEngine:
     def _should_use_reasoner(self, symbol: str, market_data: Dict, account_info: Dict) -> bool:
         """
         判断是否应该使用推理模型（Reasoner）
-        
+
+        双模型协同机制：
+        - Chat模型：每120秒分析，快速响应市场变化
+        - Reasoner模型：每300秒深度分析，重大决策时刻
+
         推理模型使用场景（优先级从高到低）：
-        1. 开仓决策（新仓位）
-        2. 重大市场变化（24h波动>5%）
-        3. 连续亏损后（近3笔全亏）
-        4. 账户回撤较大（>10%）
-        5. 高风险操作（杠杆>10x）
-        
-        日常模型使用场景：
-        1. 持仓评估（是否平仓）
-        2. 常规市场监控
-        3. 低波动市场
-        
+        1. 时间触发：每300秒执行一次深度分析
+        2. 开仓决策（新仓位）
+        3. 重大市场变化（24h波动>5%）
+        4. 连续亏损后（近3笔全亏）
+
         Args:
             symbol: 交易对
             market_data: 市场数据
             account_info: 账户信息
-            
+
         Returns:
             True表示使用推理模型，False使用日常模型
         """
+        current_time = time.time()
+
+        # 条件0：时间触发 - 每300秒执行一次Reasoner深度分析
+        if current_time - self.last_reasoner_time >= self.reasoner_interval:
+            self.last_reasoner_time = current_time
+            self.logger.info(f"[{symbol}] ⏰ 定时深度分析（每5分钟） → 使用推理模型")
+            return True
+
         # 条件1：开仓决策使用推理模型（最重要）
         # 检查是否已有持仓
         has_position = False
@@ -682,8 +694,10 @@ class AITradingEngine:
                     break
         except:
             pass
-        
+
         if not has_position:
+            # 开仓决策也更新Reasoner时间戳，避免重复深度分析
+            self.last_reasoner_time = current_time
             self.logger.info(f"[{symbol}] ✅ 开仓决策 → 使用推理模型")
             return True
         

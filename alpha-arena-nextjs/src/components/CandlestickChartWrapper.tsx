@@ -32,5 +32,7 @@ const CandlestickChartDynamic = dynamic<CandlestickChartWrapperProps>(
 )
 
 export function CandlestickChartWrapper(props: CandlestickChartWrapperProps) {
+  // 版本标识，强制浏览器重新加载
+  console.log('📊 K线图组件版本: v2.0 - 已修复SSR问题')
   return <CandlestickChartDynamic {...props} />
 }

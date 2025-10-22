@@ -74,8 +74,8 @@ def get_performance():
         total_unrealized_pnl = float(account_info.get('totalUnrealizedProfit', 0))  # 未实现盈亏
         total_margin_balance = float(account_info.get('totalMarginBalance', 0))  # 保证金余额 = 钱包余额 + 未实现盈亏
 
-        # 账户价值 = 钱包余额（实际资金，与Binance界面"钱包余额"一致）
-        account_value = total_wallet_balance
+        # 账户价值 = 保证金余额（钱包余额 + 未实现盈亏）= 真实总价值
+        account_value = total_margin_balance
 
         # 实时获取持仓
         positions = binance_client.get_active_positions()
@@ -358,8 +358,8 @@ def background_push_thread():
             total_unrealized_pnl = float(account_info.get('totalUnrealizedProfit', 0))  # 未实现盈亏
             total_margin_balance = float(account_info.get('totalMarginBalance', 0))  # 保证金余额 = 钱包余额 + 未实现盈亏
 
-            # 账户价值 = 钱包余额（实际资金，与Binance界面"钱包余额"一致）
-            account_value = total_wallet_balance
+            # 账户价值 = 保证金余额（钱包余额 + 未实现盈亏）= 真实总价值
+            account_value = total_margin_balance
 
             # 实时获取持仓
             positions = binance_client.get_active_positions()
