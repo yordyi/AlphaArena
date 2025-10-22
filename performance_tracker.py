@@ -106,9 +106,9 @@ class PerformanceTracker:
             quantity = entry_trade['quantity']
             leverage = entry_trade['leverage']
 
-            if entry_trade['action'] == 'OPEN_LONG':
+            if entry_trade['action'] in ['OPEN_LONG', 'BUY']:
                 price_diff = close_price - entry_price
-            else:  # OPEN_SHORT
+            else:  # OPEN_SHORT, SELL
                 price_diff = entry_price - close_price
 
             # 计算盈亏（考虑杠杆）
@@ -328,7 +328,7 @@ class PerformanceTracker:
             fee_rate = 0.0004
 
             for trade in trades:
-                if trade.get('action') in ['OPEN_LONG', 'OPEN_SHORT', 'CLOSE']:
+                if trade.get('action') in ['BUY', 'SELL', 'OPEN_LONG', 'OPEN_SHORT', 'CLOSE', 'CLOSE_LONG', 'CLOSE_SHORT']:
                     price = trade.get('price', 0)
                     quantity = trade.get('quantity', 0)
 

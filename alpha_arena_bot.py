@@ -242,7 +242,7 @@ class AlphaArenaBot:
                     self._save_ai_decision(symbol, ai_decision, result)
 
                     # ✅ 完全信任AI决策，不设置信心阈值
-                    if action == 'CLOSE':
+                    if action in ['CLOSE', 'CLOSE_LONG', 'CLOSE_SHORT']:
                         self.logger.info(f"  ✂️  AI决定平仓 {symbol}")
                         self.logger.info(f"  💡 理由: {ai_decision.get('reasoning', '')}")
                         self.logger.info(f"  🎯 信心度: {ai_decision.get('confidence', 0)}%")
@@ -301,7 +301,7 @@ class AlphaArenaBot:
                 # 保存所有AI决策（包括HOLD）到文件供仪表板显示
                 self._save_ai_decision(symbol, ai_decision, result.get('trade_result', {}))
 
-                if action in ['OPEN_LONG', 'OPEN_SHORT']:
+                if action in ['BUY', 'SELL', 'OPEN_LONG', 'OPEN_SHORT']:
                     # 记录交易
                     trade_info = result['trade_result']
                     trade_info['confidence'] = ai_decision.get('confidence', 0)

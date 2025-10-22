@@ -162,39 +162,51 @@
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 2rem 2.5rem;
+            padding: 1.5rem 2rem;
         }
 
-        /* ===== Header - 奢华版 ===== */
+        /* ===== Header - 左右布局 ===== */
         .header {
-            text-align: center;
-            margin-bottom: 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
             position: relative;
-            padding: 2rem 0;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(45, 212, 191, 0.1);
         }
 
         .header::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 200px;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                var(--primary) 50%,
+                transparent 100%);
             animation: headerLine 3s ease-in-out infinite;
         }
 
         @keyframes headerLine {
-            0%, 100% { width: 200px; opacity: 0.5; }
-            50% { width: 300px; opacity: 1; }
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
         .header h1 {
-            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
             font-weight: 900;
+            margin: 0;
             background: linear-gradient(135deg,
                 var(--primary) 0%,
                 var(--secondary) 40%,
@@ -222,12 +234,13 @@
         }
 
         .header .subtitle {
-            font-size: 1.1rem;
+            font-size: 0.75rem;
             color: var(--text-secondary);
-            font-weight: 600;
-            letter-spacing: 0.08em;
+            font-weight: 500;
+            letter-spacing: 0.05em;
             text-transform: uppercase;
-            margin-bottom: 1rem;
+            margin: 0;
+            opacity: 0.7;
         }
 
         .header .ai-badge {
@@ -235,24 +248,22 @@
             align-items: center;
             gap: var(--space-2);
             background: linear-gradient(135deg,
-                rgba(45, 212, 191, 0.1),
-                rgba(139, 127, 216, 0.1));
-            border: 1.5px solid;
-            border-image: linear-gradient(135deg, var(--primary), var(--secondary)) 1;
+                rgba(45, 212, 191, 0.12),
+                rgba(16, 185, 129, 0.08));
+            border: 1.5px solid var(--success);
             backdrop-filter: blur(16px);
-            padding: 0.7rem 1.5rem;
+            padding: 0.6rem 1.2rem;
             border-radius: var(--radius-full);
-            margin-top: 1rem;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 700;
             letter-spacing: 0.05em;
-            box-shadow: var(--shadow-md);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
             transition: var(--transition-base);
         }
 
         .header .ai-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
         }
 
         .ai-badge .pulse {
@@ -281,8 +292,8 @@
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1.25rem;
-            margin-bottom: 2.5rem;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         @media (max-width: 1400px) {
@@ -311,27 +322,16 @@
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             border: 1.5px solid var(--glass-border);
             border-radius: var(--radius-xl);
-            padding: 1.5rem 1.75rem;
+            padding: 1.25rem 1.5rem;
             position: relative;
             overflow: hidden;
             transition: all var(--transition-slow);
             box-shadow: var(--shadow-md);
         }
 
-        /* 顶部渐变光线 */
+        /* 顶部渐变光线 - 已移除 */
         .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg,
-                transparent 0%,
-                var(--primary) 30%,
-                var(--secondary) 70%,
-                transparent 100%);
-            animation: shimmer 3s ease-in-out infinite;
+            display: none;
         }
 
         @keyframes shimmer {
@@ -431,45 +431,36 @@
             backdrop-filter: blur(24px) saturate(180%);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1.5px solid var(--glass-border);
-            border-radius: var(--radius-2xl);
-            padding: 2.5rem;
-            margin-bottom: 2.5rem;
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            margin-bottom: 0;
             position: relative;
             overflow: hidden;
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--shadow-sm);
         }
 
-        /* 容器顶部装饰线 */
+        /* 容器顶部装饰线 - 已移除 */
         .positions-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg,
-                var(--primary) 0%,
-                var(--secondary) 50%,
-                var(--accent) 100%);
+            display: none;
         }
 
         .positions-container h2,
         .chart-container h2,
         .trades-container h2 {
-            font-size: 1.75rem;
+            font-size: 0.85rem;
             font-weight: 800;
-            margin-bottom: 2rem;
+            margin-bottom: 0.65rem;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.3rem;
             letter-spacing: -0.02em;
         }
 
         .positions-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 0.75rem;
         }
 
         .position-card {
@@ -477,8 +468,8 @@
                 rgba(255, 255, 255, 0.06) 0%,
                 rgba(255, 255, 255, 0.02) 100%);
             border: 1.5px solid rgba(255, 255, 255, 0.08);
-            border-radius: var(--radius-xl);
-            padding: 1.75rem;
+            border-radius: var(--radius-md);
+            padding: 0.85rem;
             transition: all var(--transition-slow);
             position: relative;
             overflow: hidden;
@@ -514,13 +505,13 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1.25rem;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.75rem;
             border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
         }
 
         .position-symbol {
-            font-size: 1.35rem;
+            font-size: 1rem;
             font-weight: 800;
             font-family: 'JetBrains Mono', monospace;
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
@@ -530,9 +521,9 @@
         }
 
         .position-side {
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
-            font-size: 0.85rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.7rem;
             font-weight: 700;
             letter-spacing: 0.05em;
             box-shadow: var(--shadow-sm);
@@ -563,20 +554,20 @@
         .position-info {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.25rem;
-            margin-bottom: 1.5rem;
+            gap: 0.75rem;
+            margin-bottom: 0.85rem;
         }
 
         .position-info-item {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.3rem;
         }
 
         .position-info-label {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--text-secondary);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.15rem;
             text-transform: uppercase;
             letter-spacing: 0.08em;
             font-weight: 600;
@@ -584,17 +575,17 @@
 
         .position-info-value {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1rem;
+            font-size: 0.85rem;
             font-weight: 700;
             color: var(--text-primary);
             letter-spacing: -0.01em;
         }
 
         .position-pnl {
-            padding: 1.25rem;
-            border-radius: var(--radius-lg);
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
             text-align: center;
-            margin-top: 1.25rem;
+            margin-top: 0.75rem;
             position: relative;
             overflow: hidden;
             box-shadow: var(--shadow-sm);
@@ -631,24 +622,24 @@
         }
 
         .position-pnl-value {
-            font-size: 1.75rem;
+            font-size: 1.2rem;
             font-weight: 800;
             font-family: 'JetBrains Mono', monospace;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
             letter-spacing: -0.02em;
         }
 
         .position-pnl-pct {
-            font-size: 1rem;
+            font-size: 0.8rem;
             opacity: 0.9;
             font-weight: 600;
         }
 
         .no-positions {
             text-align: center;
-            padding: 4rem 2rem;
+            padding: 2rem 1rem;
             color: var(--text-secondary);
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             font-weight: 500;
         }
 
@@ -661,26 +652,18 @@
             backdrop-filter: blur(24px) saturate(180%);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1.5px solid var(--glass-border);
-            border-radius: var(--radius-2xl);
-            padding: 2.5rem;
-            margin-bottom: 2.5rem;
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            margin-bottom: 0;
             position: relative;
             overflow: hidden;
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--shadow-sm);
         }
 
+        /* 图表和交易容器顶部装饰线 - 已移除 */
         .chart-container::before,
         .trades-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg,
-                var(--primary) 0%,
-                var(--secondary) 50%,
-                var(--accent) 100%);
+            display: none;
         }
 
         /* ===== Table 精致化 ===== */
@@ -697,8 +680,9 @@
 
         th, td {
             text-align: left;
-            padding: 1.25rem 1rem;
+            padding: 0.5rem 0.6rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.75rem;
         }
 
         th {
@@ -706,7 +690,7 @@
                 rgba(255, 255, 255, 0.08),
                 rgba(255, 255, 255, 0.04));
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.08em;
             color: var(--text-secondary);
@@ -717,7 +701,7 @@
 
         td {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
 
@@ -735,9 +719,9 @@
         .badge {
             display: inline-flex;
             align-items: center;
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
-            font-size: 0.8rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.68rem;
             font-weight: 700;
             letter-spacing: 0.05em;
             text-transform: uppercase;
@@ -766,6 +750,71 @@
         }
 
         /* ===== Footer ===== */
+
+        /* ========== 工具提示样式 ========== */
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            background: linear-gradient(135deg, #1a1b2e, #16213e);
+            color: #E0E0E0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 10000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(94, 234, 212, 0.3);
+            animation: tooltipFadeIn 0.2s ease;
+        }
+
+        [data-tooltip]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(0px);
+            border: 6px solid transparent;
+            border-top-color: #1a1b2e;
+            z-index: 10001;
+        }
+
+        @keyframes tooltipFadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-8px);
+            }
+
+        /* 禁用决策卡片及其子元素的工具提示功能 */
+        .decision-card [data-tooltip],
+        .decision-card[data-tooltip],
+        #decisions-container [data-tooltip] {
+            cursor: default;
+        }
+
+        .decision-card [data-tooltip]:hover::after,
+        .decision-card [data-tooltip]:hover::before,
+        .decision-card[data-tooltip]:hover::after,
+        .decision-card[data-tooltip]:hover::before,
+        #decisions-container [data-tooltip]:hover::after,
+        #decisions-container [data-tooltip]:hover::before {
+            content: none;
+            display: none;
+        }
+
+
+        }
         .footer {
             text-align: center;
             color: var(--text-secondary);
@@ -816,11 +865,13 @@
                 rgba(255, 255, 255, 0.06) 0%,
                 rgba(255, 255, 255, 0.02) 100%);
             border: 1.5px solid var(--glass-border);
-            border-radius: var(--radius-xl);
-            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.25rem;
             transition: all var(--transition-slow);
             position: relative;
             overflow: hidden;
+            cursor: pointer;
+            margin-bottom: 0.75rem;
         }
 
         .decision-card::before {
@@ -829,9 +880,8 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, var(--primary), transparent);
-            opacity: 0;
+            height: 2.5px;
+            opacity: 1;
             transition: var(--transition-base);
         }
 
@@ -839,13 +889,16 @@
             background: linear-gradient(135deg,
                 rgba(255, 255, 255, 0.1) 0%,
                 rgba(255, 255, 255, 0.05) 100%);
-            transform: translateY(-3px);
+            transform: translateY(-2px);
             box-shadow: var(--shadow-xl);
-            border-color: var(--primary);
         }
 
-        .decision-card:hover::before {
-            opacity: 1;
+        .decision-card.collapsed .decision-details {
+            display: none;
+        }
+
+        .decision-card.collapsed {
+            padding-bottom: 1rem;
         }
 
         .decision-header {
@@ -931,17 +984,66 @@
             font-weight: 700;
         }
 
+        .decision-summary {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.95);
+            margin: 0.75rem 0 0.5rem 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            font-weight: 500;
+        }
+
+        .decision-expand-hint {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            font-style: italic;
+            margin-top: 0.5rem;
+            opacity: 0.5;
+            transition: opacity var(--transition-base);
+            letter-spacing: 0.03em;
+        }
+
+        .decision-card:hover .decision-expand-hint {
+            opacity: 0.8;
+        }
+
+        .decision-main-action {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin: 0 0.5rem;
+        }
+
+        .decision-details {
+            margin-top: 1rem;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .decision-reasoning {
             background: linear-gradient(135deg,
                 rgba(0, 0, 0, 0.4),
                 rgba(0, 0, 0, 0.2));
             border-left: 3px solid var(--secondary);
-            padding: 1.1rem;
+            padding: 1rem;
             border-radius: var(--radius-md);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             line-height: 1.7;
             color: var(--text-primary);
-            margin-top: 1rem;
+            margin-top: 0.75rem;
             box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
@@ -949,7 +1051,7 @@
         .main-content {
             display: grid;
             grid-template-columns: 1fr 420px;
-            gap: 2.5rem;
+            gap: 1.5rem;
             margin-top: 0;
             align-items: start;
         }
@@ -957,7 +1059,7 @@
         .content-left {
             display: flex;
             flex-direction: column;
-            gap: 2.5rem;
+            gap: 1.5rem;
         }
 
         .content-right {
@@ -981,23 +1083,15 @@
             box-shadow: var(--shadow-xl);
         }
 
+        /* 决策侧边栏顶部装饰线 - 已移除 */
         .decisions-sidebar::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg,
-                var(--primary) 0%,
-                var(--secondary) 50%,
-                var(--accent) 100%);
+            display: none;
         }
 
         .decisions-sidebar h2 {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin: 0 0 2rem 0;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 0 0 0.8rem 0;
             background: linear-gradient(135deg,
                 var(--primary),
                 var(--secondary),
@@ -1007,14 +1101,15 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            letter-spacing: -0.01em;
+            letter-spacing: 0.02em;
+            opacity: 0.8;
         }
 
         /* AI决策容器 */
         #decisions-container {
             display: flex;
             flex-direction: column;
-            gap: 1.75rem;
+            gap: 1.5rem;
             padding-left: 35px;
             position: relative;
         }
@@ -1025,7 +1120,7 @@
             position: absolute;
             left: -22px;
             top: 0;
-            bottom: -1.75rem;
+            bottom: -1.25rem;
             width: 2.5px;
             background: linear-gradient(180deg,
                 var(--primary) 0%,
@@ -1221,45 +1316,44 @@
             backdrop-filter: blur(24px) saturate(180%);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1.5px solid var(--glass-border);
-            border-radius: var(--radius-xl);
-            padding: 1rem 1.5rem;
-            margin-bottom: 2.5rem;
+            border-radius: var(--radius-md);
+            padding: 0.3rem 0.5rem;
+            margin-bottom: 0.85rem;
             position: relative;
             overflow: hidden;
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--shadow-sm);
         }
 
+        /* 价格ticker顶部装饰线 - 已移除 */
         .price-ticker::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg,
-                var(--primary) 0%,
-                var(--secondary) 50%,
-                var(--accent) 100%);
+            display: none;
         }
 
         .ticker-grid {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
-            gap: 1.5rem;
+            gap: 0.35rem;
         }
 
         .ticker-item {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
-            padding: 0.75rem;
+            gap: 0.2rem;
+            padding: 0.3rem 0.35rem;
             background: linear-gradient(135deg,
                 rgba(255, 255, 255, 0.04),
                 rgba(255, 255, 255, 0.01));
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             transition: all var(--transition-base);
             position: relative;
             overflow: hidden;
+        }
+
+        .ticker-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.3rem;
         }
 
         .ticker-item::before {
@@ -1287,35 +1381,38 @@
 
         .ticker-symbol {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
+            font-size: 0.65rem;
             font-weight: 700;
             color: var(--text-secondary);
             letter-spacing: 0.05em;
+            opacity: 0.85;
         }
 
         .ticker-price {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.1rem;
-            font-weight: 700;
+            font-size: 0.85rem;
+            font-weight: 800;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.25rem;
+            flex: 1;
         }
 
         .ticker-price .price-arrow {
-            font-size: 0.8rem;
+            font-size: 0.7rem;
             transition: all var(--transition-base);
         }
 
         .ticker-change {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            font-weight: 600;
-            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.2rem 0.35rem;
             border-radius: var(--radius-sm);
             display: inline-block;
             width: fit-content;
+            white-space: nowrap;
         }
 
         .ticker-change.positive {
@@ -1389,8 +1486,10 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>⚡ ALPHA ARENA</h1>
-            <p class="subtitle">DeepSeek-V3 UltraThink AI Trading System</p>
+            <div class="header-left">
+                <h1>⚡ ALPHA ARENA</h1>
+                <p class="subtitle">DeepSeek-V3 UltraThink</p>
+            </div>
             <div class="ai-badge">
                 <span class="pulse"></span>
                 <span>AI LIVE TRADING</span>
@@ -1402,56 +1501,68 @@
             <div class="ticker-grid">
                 <div class="ticker-item" data-symbol="BTCUSDT">
                     <div class="ticker-symbol">BTC/USDT</div>
-                    <div class="ticker-price">
-                        <span id="price-BTCUSDT">--</span>
-                        <span class="price-arrow" id="arrow-BTCUSDT"></span>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-BTCUSDT">--</span>
+                            <span class="price-arrow" id="arrow-BTCUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-BTCUSDT">0.00%</div>
                     </div>
-                    <div class="ticker-change" id="change-BTCUSDT">0.00%</div>
                 </div>
 
                 <div class="ticker-item" data-symbol="ETHUSDT">
                     <div class="ticker-symbol">ETH/USDT</div>
-                    <div class="ticker-price">
-                        <span id="price-ETHUSDT">--</span>
-                        <span class="price-arrow" id="arrow-ETHUSDT"></span>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-ETHUSDT">--</span>
+                            <span class="price-arrow" id="arrow-ETHUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-ETHUSDT">0.00%</div>
                     </div>
-                    <div class="ticker-change" id="change-ETHUSDT">0.00%</div>
                 </div>
 
                 <div class="ticker-item" data-symbol="BNBUSDT">
                     <div class="ticker-symbol">BNB/USDT</div>
-                    <div class="ticker-price">
-                        <span id="price-BNBUSDT">--</span>
-                        <span class="price-arrow" id="arrow-BNBUSDT"></span>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-BNBUSDT">--</span>
+                            <span class="price-arrow" id="arrow-BNBUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-BNBUSDT">0.00%</div>
                     </div>
-                    <div class="ticker-change" id="change-BNBUSDT">0.00%</div>
                 </div>
 
                 <div class="ticker-item" data-symbol="SOLUSDT">
                     <div class="ticker-symbol">SOL/USDT</div>
-                    <div class="ticker-price">
-                        <span id="price-SOLUSDT">--</span>
-                        <span class="price-arrow" id="arrow-SOLUSDT"></span>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-SOLUSDT">--</span>
+                            <span class="price-arrow" id="arrow-SOLUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-SOLUSDT">0.00%</div>
                     </div>
-                    <div class="ticker-change" id="change-SOLUSDT">0.00%</div>
                 </div>
 
                 <div class="ticker-item" data-symbol="XRPUSDT">
                     <div class="ticker-symbol">XRP/USDT</div>
-                    <div class="ticker-price">
-                        <span id="price-XRPUSDT">--</span>
-                        <span class="price-arrow" id="arrow-XRPUSDT"></span>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-XRPUSDT">--</span>
+                            <span class="price-arrow" id="arrow-XRPUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-XRPUSDT">0.00%</div>
                     </div>
-                    <div class="ticker-change" id="change-XRPUSDT">0.00%</div>
                 </div>
 
                 <div class="ticker-item" data-symbol="ADAUSDT">
                     <div class="ticker-symbol">ADA/USDT</div>
-                    <div class="ticker-price">
-                        <span id="price-ADAUSDT">--</span>
-                        <span class="price-arrow" id="arrow-ADAUSDT"></span>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-ADAUSDT">--</span>
+                            <span class="price-arrow" id="arrow-ADAUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-ADAUSDT">0.00%</div>
                     </div>
-                    <div class="ticker-change" id="change-ADAUSDT">0.00%</div>
                 </div>
             </div>
         </div>
@@ -1514,14 +1625,14 @@
                 <!-- 图表 -->
                 <div class="chart-container">
                     <h2>📈 账户价值曲线</h2>
-                    <div style="height: 400px; position: relative;">
+                    <div style="height: 250px; position: relative;">
                         <canvas id="performanceChart"></canvas>
                     </div>
                 </div>
 
                 <!-- 交易记录 -->
                 <div class="trades-container">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                         <h2 style="margin: 0;">🔥 最近交易记录</h2>
                         <div style="display: flex; gap: 12px; align-items: center;">
                             <button id="prev-page">← 上一页</button>
@@ -1556,7 +1667,7 @@
             <!-- 右侧AI决策 -->
             <div class="content-right">
                 <div class="decisions-sidebar">
-                    <h2>🤖 AI实时决策</h2>
+                    <h2>DeepSeek 决策</h2>
                     <div id="decisions-container">
                         <div class="loading">正在加载AI决策...</div>
                     </div>
@@ -1575,6 +1686,7 @@
     <!-- Socket.IO 客户端库 -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <script>
         // ==================== 数据状态管理系统 ====================
         const AppState = {
@@ -1612,13 +1724,13 @@
                 }
 
                 const now = new Date();
-                const twoMinutesAgo = new Date(now.getTime() - 2 * 60 * 1000);
+                const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
 
                 this.decisions = decisions.filter(decision => {
                     if (!decision.time) return false;
                     try {
                         const decisionTime = new Date(decision.time.replace(',', '.'));
-                        return decisionTime >= twoMinutesAgo;
+                        return decisionTime >= thirtyMinutesAgo;
                     } catch (e) {
                         return true;
                     }
@@ -1759,6 +1871,18 @@
             }
 
             requestAnimationFrame(animate);
+        }
+
+        // Toggle decision card collapse/expand
+        function toggleDecisionCard(card) {
+            event.stopPropagation();
+            card.classList.toggle('collapsed');
+
+            // Update hint text
+            const hint = card.querySelector('.decision-expand-hint');
+            if (hint) {
+                hint.textContent = card.classList.contains('collapsed') ? 'click to expand' : 'click to collapse';
+            }
         }
 
         // Update performance metrics
@@ -2080,18 +2204,33 @@
                         const container = document.getElementById('decisions-container');
 
                         if (decisions.length === 0) {
-                            container.innerHTML = '<div class="loading">最近2分钟无AI决策...</div>';
+                            container.innerHTML = '<div class="loading">最近30分钟无AI决策...</div>';
                             return;
                         }
 
                         container.innerHTML = decisions.map(decision => {
                             let actionClass = 'hold';
                             let actionText = decision.action;
-                            if (actionText.includes('BUY') || actionText.includes('LONG')) {
+
+                            // 动作名称直接使用英文 (中文映射已禁用)
+                            // const actionMap = {
+                            //     'HOLD': '持有',
+                            //     'BUY': '买入',
+                            //     'SELL': '卖出',
+                            //     'OPEN_LONG': '开多',
+                            //     'OPEN_SHORT': '开空',
+                            //     'CLOSE': '平仓',
+                            //     'CLOSE_LONG': '平多',
+                            //     'CLOSE_SHORT': '平空'
+                            // };
+
+                            actionText = decision.action;
+
+                            if (decision.action.includes('BUY') || decision.action.includes('LONG')) {
                                 actionClass = 'buy';
-                            } else if (actionText.includes('SELL') || actionText.includes('SHORT')) {
+                            } else if (decision.action.includes('SELL') || decision.action.includes('SHORT')) {
                                 actionClass = 'sell';
-                            } else if (actionText.includes('CLOSE')) {
+                            } else if (decision.action.includes('CLOSE')) {
                                 actionClass = 'close';
                             }
 
@@ -2103,14 +2242,13 @@
                                 : 'background: linear-gradient(135deg, rgba(45, 212, 191, 0.15), rgba(45, 212, 191, 0.05)); border: 1.5px solid rgba(45, 212, 191, 0.35); box-shadow: 0 8px 24px rgba(45, 212, 191, 0.2);';
 
                             const modelBadge = isReasonerModel
-                                ? '<span style="background: linear-gradient(135deg, #8B7FD8, #A78BFA); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(139, 127, 216, 0.5);">🧠 REASONER</span>'
-                                : '<span style="background: linear-gradient(135deg, #2DD4BF, #5EEAD4); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(45, 212, 191, 0.5);">💬 CHAT</span>';
+                                ? '<span style="background: linear-gradient(135deg, #8B7FD8, #A78BFA); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(139, 127, 216, 0.5);">REASONER</span>'
+                                : '<span style="background: linear-gradient(135deg, #2DD4BF, #5EEAD4); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(45, 212, 191, 0.5);">CHAT</span>';
 
                             const reasoningSection = decision.reasoning_content && isReasonerModel
                                 ? `<div style="margin-top: 15px; padding: 14px; background: linear-gradient(135deg, rgba(139, 127, 216, 0.2), rgba(139, 127, 216, 0.1)); border-left: 3px solid #8B7FD8; border-radius: 8px; font-size: 0.85rem; color: #D0D0E0; line-height: 1.6;">
-                                    <div style="font-weight: 700; color: #A78BFA; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
-                                        <span>🧠</span>
-                                        <span>深度推理过程</span>
+                                    <div style="font-weight: 700; color: #A78BFA; margin-bottom: 8px; font-size: 0.9rem;">
+                                        深度推理过程
                                     </div>
                                     <div style="font-size: 0.8rem; line-height: 1.7;">
                                         ${decision.reasoning_content}
@@ -2118,23 +2256,37 @@
                                 </div>`
                                 : '';
 
+                            // 完整时间格式（精确到秒）
+                            const timeMatch = decision.time.match(/(\d{2}):(\d{2}):(\d{2})/);
+                            const detailedTime = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3]}` : decision.time;
+
                             return `
-                                <div class="decision-card" data-model="${isReasonerModel ? 'reasoner' : 'chat'}" style="${cardStyle}">
-                                    <div class="decision-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                                            <span class="decision-symbol" style="font-size: 1.2rem; font-weight: 800; color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'};">${decision.symbol}</span>
-                                            ${modelBadge}
+                                <div class="decision-card collapsed" data-model="${isReasonerModel ? 'reasoner' : 'chat'}" style="${cardStyle}" onclick="toggleDecisionCard(this)">
+                                    <div class="decision-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <div style="display: flex; align-items: center;">
+                                            <span class="decision-main-action ${actionClass}" style="text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${actionText}</span>
                                         </div>
-                                        <span class="decision-time" style="font-size: 0.75rem; color: var(--text-tertiary); font-family: 'JetBrains Mono', monospace;">${decision.time}</span>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            ${modelBadge}
+                                            <span style="background: rgba(0,0,0,0.3); color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'}; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; border: 1px solid ${isReasonerModel ? 'rgba(139, 127, 216, 0.4)' : 'rgba(45, 212, 191, 0.4)'};">${decision.symbol}</span>
+                                            <span class="decision-time" style="font-size: 0.7rem; color: rgba(255,255,255,0.5); font-family: 'JetBrains Mono', monospace; font-weight: 600;">${detailedTime}</span>
+                                        </div>
                                     </div>
-                                    <div class="decision-action" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                        <span class="action-badge ${actionClass}" style="padding: 7px 16px; border-radius: 8px; font-weight: 700; font-size: 0.9rem;">${actionText}</span>
-                                        <span class="decision-confidence" style="font-size: 0.9rem; font-weight: 700; color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'};">信心度: ${decision.confidence}</span>
+                                    <div class="decision-summary">
+                                        ${decision.reasoning}
                                     </div>
-                                    <div class="decision-reasoning" style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.7; padding: 12px; background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.2)); border-radius: 8px;">
-                                        💡 ${decision.reasoning}
+                                    <div class="decision-expand-hint">点击展开</div>
+                                    <div class="decision-details">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px 0; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                                            <span style="font-size: 0.95rem; font-weight: 700; color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'};">${decision.symbol}</span>
+                                            <span class="decision-confidence" style="font-size: 0.85rem; font-weight: 700; color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'};">信心度 ${decision.confidence}%</span>
+                                        </div>
+                                        <div class="decision-reasoning">
+                                            <div style="font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 6px;">完整理由</div>
+                                            <div style="color: rgba(255,255,255,0.9);">${decision.reasoning}</div>
+                                        </div>
+                                        ${reasoningSection}
                                     </div>
-                                    ${reasoningSection}
                                 </div>
                             `;
                         }).join('');
@@ -2368,51 +2520,41 @@
             updateDecisions();
         }, 2 * 60 * 1000);
 
-        // ==================== Binance WebSocket 实时价格流 ====================
+        // ==================== Binance REST API 实时价格（更可靠）====================
 
         const priceSymbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT'];
         const previousPricesWS = {};
-        let binanceWS = null;
 
-        function connectBinanceWebSocket() {
-            // 构建WebSocket流URL（组合所有ticker）
-            const streams = priceSymbols.map(s => `${s.toLowerCase()}@ticker`).join('/');
-            const wsUrl = `wss://stream.binance.com:9443/stream?streams=${streams}`;
+        // 使用REST API获取实时价格（每2秒更新一次）
+        function fetchBinancePrices() {
+            // 批量获取所有交易对的24小时ticker
+            const symbolsQuery = priceSymbols.map(s => `"${s}"`).join(',');
 
-            console.log('%c💰 连接Binance实时价格流...', 'color: #2DD4BF; font-weight: bold;');
+            fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbolsQuery}]`)
+                .then(response => response.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        data.forEach(ticker => {
+                            const symbol = ticker.symbol;
+                            const price = parseFloat(ticker.lastPrice);
+                            const priceChange = parseFloat(ticker.priceChangePercent);
 
-            binanceWS = new WebSocket(wsUrl);
-
-            binanceWS.onopen = function() {
-                console.log('%c✅ Binance WebSocket 已连接', 'color: #10B981; font-weight: bold;');
-            };
-
-            binanceWS.onmessage = function(event) {
-                try {
-                    const message = JSON.parse(event.data);
-                    const data = message.data;
-
-                    if (!data || !data.s) return;
-
-                    const symbol = data.s; // BTCUSDT
-                    const price = parseFloat(data.c); // 最新价格
-                    const priceChange = parseFloat(data.P); // 24h涨跌幅
-
-                    updateTickerPrice(symbol, price, priceChange);
-                } catch (error) {
-                    console.error('Price update error:', error);
-                }
-            };
-
-            binanceWS.onerror = function(error) {
-                console.error('%c❌ Binance WebSocket 错误:', 'color: #EF4444;', error);
-            };
-
-            binanceWS.onclose = function() {
-                console.log('%c⚠️ Binance WebSocket 断开，5秒后重连...', 'color: #F59E0B;');
-                setTimeout(connectBinanceWebSocket, 5000);
-            };
+                            updateTickerPrice(symbol, price, priceChange);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('%c❌ 价格获取失败:', 'color: #EF4444;', error);
+                    // 失败后继续重试
+                });
         }
+
+        // 初始加载
+        console.log('%c💰 启动实时价格更新...', 'color: #2DD4BF; font-weight: bold;');
+        fetchBinancePrices();
+
+        // 每2秒更新一次价格
+        setInterval(fetchBinancePrices, 2000);
 
         function updateTickerPrice(symbol, price, priceChange) {
             const priceElem = document.getElementById(`price-${symbol}`);
@@ -2476,6 +2618,89 @@
         console.log('%c⚡ ALPHA ARENA DASHBOARD', 'font-size: 20px; font-weight: bold; color: #2DD4BF;');
         console.log('%cDeepSeek-V3 UltraThink AI Trading System', 'font-size: 14px; color: #8B7FD8;');
         console.log('%cWebSocket 实时推送已启用 (延迟 <100ms)', 'font-size: 12px; color: #10B981;');
+
+        // ========== 交易历史过滤功能 ==========
+        let allTradesData = [];
+
+        // 应用过滤器
+        function applyTradeFilters() {
+            const searchTerm = document.getElementById('trade-search')?.value.toLowerCase() || '';
+            const typeFilter = document.getElementById('trade-type-filter')?.value || 'all';
+            const pnlFilter = document.getElementById('trade-pnl-filter')?.value || 'all';
+
+            const tableRows = document.querySelectorAll('.trades-container tbody tr');
+
+            tableRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 4) return;
+
+                const symbol = cells[1]?.textContent.toLowerCase() || '';
+                const type = cells[2]?.textContent || '';
+                const pnlText = cells[5]?.textContent || '';
+
+                // Symbol搜索过滤
+                const symbolMatch = symbol.includes(searchTerm);
+
+                // 类型过滤
+                const typeMatch = typeFilter === 'all' || type.includes(typeFilter);
+
+                // 盈亏过滤
+                let pnlMatch = true;
+                if (pnlFilter === 'profit') {
+                    pnlMatch = pnlText.includes('+') || parseFloat(pnlText) > 0;
+                } else if (pnlFilter === 'loss') {
+                    pnlMatch = pnlText.includes('-') && !pnlText.includes('+');
+                }
+
+                // 显示或隐藏行
+                if (symbolMatch && typeMatch && pnlMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // 绑定过滤器事件
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const searchBox = document.getElementById('trade-search');
+                const typeFilter = document.getElementById('trade-type-filter');
+                const pnlFilter = document.getElementById('trade-pnl-filter');
+                const resetButton = document.getElementById('reset-filters');
+
+                if (searchBox) searchBox.addEventListener('input', applyTradeFilters);
+                if (typeFilter) typeFilter.addEventListener('change', applyTradeFilters);
+                if (pnlFilter) pnlFilter.addEventListener('change', applyTradeFilters);
+                if (resetButton) {
+                    resetButton.addEventListener('click', () => {
+                        if (searchBox) searchBox.value = '';
+                        if (typeFilter) typeFilter.value = 'all';
+                        if (pnlFilter) pnlFilter.value = 'all';
+                        applyTradeFilters();
+                    });
+                }
+            }, 500);
+        });
+
+
+        // ========== 图表导出和缩放功能 ==========
+        function exportChartAsImage() {
+            const canvas = document.getElementById('equity-chart');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `alpha-arena-chart-${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+
+        function resetChartZoom() {
+            if (window.equityChart) {
+                window.equityChart.resetZoom();
+            }
+        }
+
     </script>
 
     <!-- PWA Service Worker Registration -->

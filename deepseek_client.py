@@ -103,40 +103,79 @@ class DeepSeekClient:
             }
 
     def chat_completion(self, messages: List[Dict], model: str = "deepseek-chat",
-                       temperature: float = 0.7, max_tokens: int = 2000) -> Dict:
+                       temperature: float = 0.7, max_tokens: int = 2000,
+                       timeout: int = None, max_retries: int = 2) -> Dict:
         """
-        调用 DeepSeek Chat 完成 API
+        调用 DeepSeek Chat 完成 API（带重试机制）
 
         Args:
             messages: 对话消息列表
             model: 模型名称
             temperature: 温度参数 (0-2)
             max_tokens: 最大 token 数
+            timeout: 超时时间（秒），None则自动根据模型类型设置
+            max_retries: 最大重试次数
 
         Returns:
             API 响应
         """
-        try:
-            payload = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens
-            }
+        # 根据模型类型自动设置超时时间
+        if timeout is None:
+            if "reasoner" in model:
+                timeout = 180  # 推理模型：3分钟（深度思考需要更长时间）
+            else:
+                timeout = 60   # Chat模型：1分钟
 
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=self.headers,
-                json=payload,
-                timeout=60  # 推理模型需要更长时间
-            )
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
 
-            response.raise_for_status()
-            return response.json()
+        # 重试机制
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    self.logger.warning(f"正在重试... (第{attempt}/{max_retries}次)")
 
-        except Exception as e:
-            self.logger.error(f"DeepSeek API 调用失败: {e}")
-            raise
+                response = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=self.headers,
+                    json=payload,
+                    timeout=timeout
+                )
+
+                response.raise_for_status()
+                result = response.json()
+
+                # 记录缓存使用情况（如果API返回了缓存统计）
+                if 'usage' in result:
+                    usage = result['usage']
+                    cache_hit = usage.get('prompt_cache_hit_tokens', 0)
+                    cache_miss = usage.get('prompt_cache_miss_tokens', 0)
+                    total_prompt = usage.get('prompt_tokens', 0)
+
+                    if cache_hit > 0 or cache_miss > 0:
+                        cache_rate = (cache_hit / (cache_hit + cache_miss) * 100) if (cache_hit + cache_miss) > 0 else 0
+                        savings = cache_hit * 0.9  # 缓存命中节省90%成本
+                        self.logger.info(f"💰 缓存统计 - 命中率: {cache_rate:.1f}% | "
+                                       f"命中: {cache_hit} tokens | 未命中: {cache_miss} tokens | "
+                                       f"节省约: {savings:.0f} tokens成本")
+
+                return result
+
+            except requests.exceptions.Timeout as e:
+                if attempt < max_retries:
+                    self.logger.warning(f"请求超时（{timeout}秒），准备重试...")
+                    continue
+                else:
+                    self.logger.error(f"DeepSeek API 超时失败（已重试{max_retries}次）: {e}")
+                    raise
+
+            except Exception as e:
+                self.logger.error(f"DeepSeek API 调用失败: {e}")
+                raise
 
     def reasoning_completion(self, messages: List[Dict], max_tokens: int = 4000) -> Dict:
         """
@@ -424,6 +463,138 @@ class DeepSeekClient:
 ⚡ **重要计算**:
 名义价值 = 账户余额 × position_size% × leverage
 必须确保: 名义价值 ≥ $20 USDT (Binance最低要求)
+
+═══════════════════════════════════════════════════════════
+🎯 **高级仓位管理策略** (NEW! 9大专业策略可用):
+═══════════════════════════════════════════════════════════
+
+系统现已支持9种专业级仓位管理策略，可在你的决策中使用：
+
+### 1. 🔄 ROLL - 滚仓（浮盈加仓）
+**用途**: 在强趋势中使用浮盈开新仓，实现复利增长
+**触发条件**:
+- 持仓浮盈≥10%
+- 趋势极强（连续突破关键阻力/支撑）
+- 波动率适中
+**决策格式**:
+{
+  "action": "ROLL",
+  "confidence": 85,
+  "reasoning": "BTC强势突破67000阻力，浮盈12%，适合滚仓",
+  "leverage": 2,
+  "profit_threshold_pct": 10.0
+}
+
+### 2. 📐 PYRAMID - 金字塔加仓
+**用途**: 价格回踩时递减加仓，降低平均成本
+**触发条件**: 趋势未改变，价格回到有利位置（如支撑位）
+**决策格式**:
+{
+  "action": "PYRAMID",
+  "confidence": 75,
+  "reasoning": "ETH回踩3800支撑，趋势保持，第2层金字塔加仓",
+  "base_size_usdt": 100,
+  "current_pyramid_level": 1,
+  "max_pyramids": 3,
+  "reduction_factor": 0.5
+}
+
+### 3. 🎯 MULTI_TP - 多级止盈
+**用途**: 分批平仓，锁定利润同时保留上涨空间
+**触发条件**: 持仓盈利，想要分批获利
+**决策格式**:
+{
+  "action": "MULTI_TP",
+  "confidence": 80,
+  "reasoning": "BTC盈利15%，设置多级止盈：20%平30%，30%平40%，50%全平",
+  "tp_levels": [
+    {"profit_pct": 20, "close_pct": 30},
+    {"profit_pct": 30, "close_pct": 40},
+    {"profit_pct": 50, "close_pct": 100}
+  ]
+}
+
+### 4. 🛡️ MOVE_SL_BREAKEVEN - 移动止损到盈亏平衡
+**用途**: 盈利后将止损移至成本价，保护本金
+**触发条件**: 持仓盈利5%+
+**决策格式**:
+{
+  "action": "MOVE_SL_BREAKEVEN",
+  "confidence": 75,
+  "reasoning": "ETH盈利7%，移动止损至成本价+0.1%保护本金",
+  "profit_trigger_pct": 5.0,
+  "breakeven_offset_pct": 0.1
+}
+
+### 5. 📊 ATR_STOP - ATR自适应止损
+**用途**: 根据波动率(ATR)动态调整止损距离
+**触发条件**: 市场波动率变化大
+**决策格式**:
+{
+  "action": "ATR_STOP",
+  "confidence": 70,
+  "reasoning": "市场波动率上升，使用2倍ATR设置自适应止损",
+  "atr_multiplier": 2.0
+}
+
+### 6. ⚖️ ADJUST_LEVERAGE - 动态杠杆调整
+**用途**: 根据波动率自动调整杠杆（高波降杠杆，低波提杠杆）
+**触发条件**: 市场波动率显著变化
+**决策格式**:
+{
+  "action": "ADJUST_LEVERAGE",
+  "confidence": 65,
+  "reasoning": "市场波动率升至3.5%，降低杠杆至3x控制风险",
+  "base_leverage": 5,
+  "min_leverage": 2,
+  "max_leverage": 10
+}
+
+### 7. 🔰 HEDGE - 对冲策略
+**用途**: 开反向仓位锁定利润或降低风险
+**触发条件**: 盈利但担心回撤，或重大消息前
+**决策格式**:
+{
+  "action": "HEDGE",
+  "confidence": 60,
+  "reasoning": "美联储会议前，对50%BTC多仓开空单对冲",
+  "hedge_ratio": 0.5
+}
+
+### 8. ⚖️ REBALANCE - 仓位再平衡
+**用途**: 调整仓位大小到目标配置
+**触发条件**: 仓位因价格变化偏离目标
+**决策格式**:
+{
+  "action": "REBALANCE",
+  "confidence": 70,
+  "reasoning": "BTC仓位因上涨达150 USDT，再平衡至目标100 USDT",
+  "target_size_usdt": 100.0
+}
+
+### 9. 💰 FUNDING_ARB - 资金费率套利
+**用途**: 资金费率极端时开反向仓收取费用
+**触发条件**: 资金费率>0.01%或<-0.01%，横盘市场
+**决策格式**:
+{
+  "action": "FUNDING_ARB",
+  "confidence": 55,
+  "reasoning": "BTC资金费率0.03%，开空单套利",
+  "threshold_rate": 0.01
+}
+
+💡 **策略组合建议**:
+- **趋势开始**: 开仓 + ATR_STOP → 盈利5% → MOVE_SL_BREAKEVEN
+- **趋势确认**: 盈利10% → ROLL（滚仓）或 PYRAMID（金字塔）
+- **趋势末端**: MULTI_TP（分批止盈）或 HEDGE（对冲保护）
+- **震荡市场**: REBALANCE + FUNDING_ARB
+- **高波动**: ADJUST_LEVERAGE（降杠杆）+ ATR_STOP（放宽止损）
+
+⚠️ **使用注意**:
+- 高级策略建议confidence ≥ 65
+- 每次决策最多使用2-3个策略
+- ROLL和PYRAMID有严格风控限制
+- 止损永远第一，不违背风险管理
 
 ═══════════════════════════════════════════════════════════
 🚀 **高级订单类型** (系统已实现，未来可考虑使用):
@@ -721,12 +892,19 @@ class DeepSeekClient:
 - ✅ **重大信号才行动**: 只在极端情况下才平仓，不要被小波动吓到
 - ⚠️ **杠杆风险**: 高杠杆需要谨慎，但不是过度交易的理由
 
-请返回严格的JSON格式：
+请返回严格的JSON格式（支持精确平仓和部分平仓）：
 {{
-    "action": "CLOSE" | "HOLD",
+    "action": "CLOSE" | "CLOSE_LONG" | "CLOSE_SHORT" | "HOLD",
     "confidence": 0-100,
-    "reasoning": "简短评估理由(不超过100字)"
+    "reasoning": "简短评估理由(不超过100字)",
+    "close_percentage": 50-100  (可选参数：平仓百分比，默认100%全平，可设置50-99实现分批止盈)
 }}
+
+**精确平仓说明**：
+- "CLOSE": 平掉所有仓位（多单+空单）
+- "CLOSE_LONG": 只平掉多单
+- "CLOSE_SHORT": 只平掉空单
+- close_percentage: 部分止盈，如设置70表示平掉70%锁定利润，保留30%继续持有
 """
 
         messages = [
@@ -809,10 +987,16 @@ ATR: {market_data.get('atr', 'N/A')}
 未实现盈亏: ${account_info.get('unrealized_pnl', 'N/A')}
 """
 
-        if trade_history and len(trade_history) > 0:
-            recent_trades = trade_history[-5:]
+        # 胜率显示策略：只有在交易次数足够时才显示（避免误导AI）
+        MIN_TRADES_FOR_WINRATE = 20  # 可在config.py中配置
+        if trade_history and len(trade_history) >= MIN_TRADES_FOR_WINRATE:
+            recent_trades = trade_history[-10:]  # 看最近10笔，更有统计意义
             wins = sum(1 for t in recent_trades if t.get('pnl', 0) > 0)
-            prompt += f"\n## 近期表现\n最近5笔胜率: {wins}/5\n"
+            winrate_pct = (wins / len(recent_trades)) * 100
+            prompt += f"\n## 近期表现\n最近{len(recent_trades)}笔胜率: {winrate_pct:.1f}% ({wins}胜/{len(recent_trades)-wins}负)\n"
+        elif trade_history and len(trade_history) > 0:
+            # 交易次数太少，不显示胜率，只显示交易数
+            prompt += f"\n## 交易状态\n已完成交易: {len(trade_history)}笔 (数据积累中，暂不显示胜率)\n"
 
         prompt += "\n请分析并给出决策（JSON格式）。"
 

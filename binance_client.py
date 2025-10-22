@@ -516,6 +516,138 @@ class BinanceClient:
 
         return results
 
+    def close_long(self, symbol: str) -> Dict:
+        """
+        平多单（专用函数）
+
+        Args:
+            symbol: 交易对
+
+        Returns:
+            平仓结果
+        """
+        return self.close_position(symbol, position_side='LONG')
+
+    def close_short(self, symbol: str) -> Dict:
+        """
+        平空单（专用函数）
+
+        Args:
+            symbol: 交易对
+
+        Returns:
+            平仓结果
+        """
+        return self.close_position(symbol, position_side='SHORT')
+
+    def close_position_partial(self, symbol: str, percentage: float,
+                               position_side: str = 'BOTH') -> Dict:
+        """
+        部分平仓
+
+        Args:
+            symbol: 交易对
+            percentage: 平仓百分比 (0-100)
+            position_side: 持仓方向 ('BOTH', 'LONG', 'SHORT')
+
+        Returns:
+            平仓结果
+
+        Example:
+            # 平掉50%的多单仓位
+            close_position_partial('BTCUSDT', 50, 'LONG')
+        """
+        if not 0 < percentage <= 100:
+            raise ValueError("平仓百分比必须在0-100之间")
+
+        positions = self.get_futures_positions()
+
+        for pos in positions:
+            if pos['symbol'] != symbol:
+                continue
+            if position_side != 'BOTH' and pos.get('positionSide') != position_side:
+                continue
+
+            position_amt = float(pos['positionAmt'])
+            if position_amt == 0:
+                continue
+
+            # 计算平仓数量
+            close_quantity = abs(position_amt) * (percentage / 100)
+
+            # 根据交易对设置精度（与开仓逻辑保持一致）
+            if 'BTC' in symbol:
+                close_quantity = round(close_quantity, 3)  # BTC: 0.001
+            elif 'ETH' in symbol:
+                close_quantity = round(close_quantity, 3)  # ETH: 0.001
+            elif 'BNB' in symbol:
+                close_quantity = round(close_quantity, 1)  # BNB: 0.1
+            elif 'SOL' in symbol:
+                close_quantity = round(close_quantity, 1)  # SOL: 0.1
+            elif 'DOGE' in symbol:
+                close_quantity = round(close_quantity, 0)  # DOGE: 整数
+            else:
+                close_quantity = round(close_quantity, 1)  # 默认: 0.1
+
+            # 确保不为0
+            if close_quantity == 0:
+                return {'success': False, 'error': '平仓数量太小，无法执行'}
+
+            side = 'SELL' if position_amt > 0 else 'BUY'
+
+            return self.create_futures_order(
+                symbol=symbol,
+                side=side,
+                order_type='MARKET',
+                quantity=close_quantity,
+                position_side=pos.get('positionSide', 'BOTH'),
+                reduce_only=True  # 确保只平仓不开仓
+            )
+
+        return {'msg': 'No position to close'}
+
+    def cancel_stop_orders(self, symbol: str) -> Dict:
+        """
+        取消指定交易对的所有止损止盈订单
+
+        Args:
+            symbol: 交易对
+
+        Returns:
+            取消结果 {'success': bool, 'cancelled_count': int}
+        """
+        try:
+            # 获取所有挂单
+            open_orders = self.get_futures_open_orders(symbol)
+
+            cancelled_count = 0
+            errors = []
+
+            for order in open_orders:
+                order_type = order.get('type', '')
+                # 只取消止损止盈相关订单
+                if order_type in ['STOP_MARKET', 'TAKE_PROFIT_MARKET',
+                                 'STOP', 'TAKE_PROFIT', 'TRAILING_STOP_MARKET']:
+                    try:
+                        self.cancel_futures_order(symbol, order_id=order['orderId'])
+                        cancelled_count += 1
+                    except Exception as e:
+                        errors.append(f"订单{order['orderId']}: {str(e)}")
+
+            return {
+                'success': True,
+                'cancelled_count': cancelled_count,
+                'message': f'成功取消 {cancelled_count} 个止损止盈订单',
+                'errors': errors if errors else None
+            }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'cancelled_count': 0
+            }
+
     # ========== 便捷方法 ==========
 
     def get_usdt_balance(self) -> float:

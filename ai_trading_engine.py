@@ -14,6 +14,7 @@ from deepseek_client import DeepSeekClient
 from binance_client import BinanceClient
 from market_analyzer import MarketAnalyzer
 from risk_manager import RiskManager
+from advanced_position_manager import AdvancedPositionManager
 
 
 class AITradingEngine:
@@ -38,6 +39,9 @@ class AITradingEngine:
         self.logger = logging.getLogger(__name__)
         self.trade_history = []
 
+        # 高级仓位管理器
+        self.adv_position_manager = AdvancedPositionManager(binance_client, market_analyzer)
+
         # 交易冷却期 (symbol -> timestamp)
         # 防止在短时间内重复尝试失败的交易
         self.trade_cooldown = {}
@@ -47,7 +51,7 @@ class AITradingEngine:
         # Chat模型: 每120秒分析（快速反应）
         # Reasoner模型: 每300秒深度分析（重大决策）
         self.last_reasoner_time = 0
-        self.reasoner_interval = 300  # 5分钟执行一次Reasoner
+        self.reasoner_interval = 600  # 10分钟执行一次Reasoner（降低成本）
 
     def analyze_and_trade(self, symbol: str, max_position_pct: float = 10.0) -> Dict:
         """
@@ -355,8 +359,8 @@ class AITradingEngine:
 
         leverage = int(leverage)
 
-        # 🔒 杠杆上限 - 最大30倍
-        MAX_LEVERAGE = 30
+        # 🔒 杠杆上限 - 最大20倍（与DeepSeek提示词保持一致）
+        MAX_LEVERAGE = 20
         if leverage > MAX_LEVERAGE:
             self.logger.warning(f"⚠️ AI建议杠杆{leverage}x超过上限{MAX_LEVERAGE}x，已强制降至{MAX_LEVERAGE}x")
             leverage = MAX_LEVERAGE
@@ -373,7 +377,8 @@ class AITradingEngine:
         trade_amount = balance * (position_size_pct / 100)
 
         try:
-            if action == 'BUY':
+            # 统一处理开多动作 (BUY 或 OPEN_LONG)
+            if action in ['BUY', 'OPEN_LONG']:
                 # 开多单
                 result = self._open_long_position(
                     symbol, trade_amount, leverage,
@@ -381,7 +386,8 @@ class AITradingEngine:
                 )
                 return result
 
-            elif action == 'SELL':
+            # 统一处理开空动作 (SELL 或 OPEN_SHORT)
+            elif action in ['SELL', 'OPEN_SHORT']:
                 # 开空单
                 result = self._open_short_position(
                     symbol, trade_amount, leverage,
@@ -389,15 +395,58 @@ class AITradingEngine:
                 )
                 return result
 
-            elif action == 'CLOSE':
-                # 平仓
-                result = self.binance.close_position(symbol)
-                return {'success': True, 'action': 'CLOSE', 'result': result}
+            elif action in ['CLOSE', 'CLOSE_LONG', 'CLOSE_SHORT']:
+                # 平仓（支持精确方向和部分平仓）
+
+                # 1. 确定平仓方向
+                position_side = 'BOTH'  # 默认平所有
+                if action == 'CLOSE_LONG':
+                    position_side = 'LONG'
+                elif action == 'CLOSE_SHORT':
+                    position_side = 'SHORT'
+
+                # 2. 检查是否部分平仓（从AI决策中获取）
+                close_percentage = decision.get('close_percentage', 100)
+
+                # 3. 执行平仓
+                if close_percentage < 100:
+                    # 部分平仓
+                    self.logger.info(f"📊 [{symbol}] 执行部分平仓: {close_percentage}%, 方向: {position_side}")
+                    result = self.binance.close_position_partial(
+                        symbol,
+                        percentage=close_percentage,
+                        position_side=position_side
+                    )
+                else:
+                    # 全部平仓
+                    self.logger.info(f"📊 [{symbol}] 执行全部平仓, 方向: {position_side}")
+                    result = self.binance.close_position(symbol, position_side=position_side)
+
+                # 4. 检查平仓是否真的成功
+                success = 'orderId' in result or 'clientOrderId' in result
+
+                if not success and result.get('msg') == 'No position to close':
+                    self.logger.warning(f"⚠️ [{symbol}] 没有持仓可平仓")
+                    return {'success': False, 'action': action, 'error': '没有持仓'}
+
+                # 5. 平仓成功后取消所有止损止盈订单
+                if success:
+                    try:
+                        cancel_result = self.binance.cancel_stop_orders(symbol)
+                        if cancel_result.get('success'):
+                            cancelled_count = cancel_result.get('cancelled_count', 0)
+                            if cancelled_count > 0:
+                                self.logger.info(f"✅ [{symbol}] 已自动取消 {cancelled_count} 个止损止盈挂单")
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ [{symbol}] 取消挂单失败（不影响平仓）: {e}")
+
+                return {'success': success, 'action': action, 'result': result}
 
             elif action == 'HOLD':
                 return {'success': True, 'action': 'HOLD'}
 
             else:
+                self.logger.error(f"❌ 未知操作: {action}")
                 return {'success': False, 'error': f'未知操作: {action}'}
 
         except Exception as e:
@@ -408,11 +457,46 @@ class AITradingEngine:
                            stop_loss_pct: float, take_profit_pct: float) -> Dict:
         """开多单"""
         try:
+            # 获取当前价格（需要先获取价格才能计算杠杆）
+            current_price = self.market_analyzer.get_current_price(symbol)
+
+            # 🔧 智能杠杆调整：同时满足币安名义价值和精度要求
+            # 先确定精度规则
+            if 'BTC' in symbol:
+                precision = 3  # BTC: 0.001
+                min_qty = 0.001
+            elif 'ETH' in symbol:
+                precision = 3  # ETH: 0.001
+                min_qty = 0.001
+            elif 'BNB' in symbol:
+                precision = 1  # BNB: 0.1
+                min_qty = 0.1
+            elif 'SOL' in symbol:
+                precision = 1  # SOL: 0.1
+                min_qty = 0.1
+            elif 'DOGE' in symbol:
+                precision = 0  # DOGE: 整数
+                min_qty = 1.0
+            else:
+                precision = 1  # 默认: 0.1
+                min_qty = 0.1
+
+            # 计算满足精度要求所需的最小名义价值
+            min_notional_for_precision = min_qty * current_price
+            min_notional = max(20, min_notional_for_precision)  # 至少$20，或满足精度要求
+
+            # 计算所需杠杆
+            required_leverage = int(min_notional / amount) + 1
+            original_leverage = leverage
+            leverage = min(max(leverage, required_leverage), 25)  # 最大25倍
+
+            if leverage != original_leverage:
+                self.logger.info(f"💡 [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
+                               f"(名义价值 ${amount*original_leverage:.2f} → ${amount*leverage:.2f}, "
+                               f"精度要求: ≥{min_qty} {symbol.replace('USDT', '')})")
+
             # 设置杠杆
             self.binance.set_leverage(symbol, leverage)
-
-            # 获取当前价格
-            current_price = self.market_analyzer.get_current_price(symbol)
 
             # 计算数量并按交易对调整精度
             raw_quantity = (amount * leverage) / current_price
@@ -449,7 +533,7 @@ class AITradingEngine:
                 position_side='LONG'
             )
 
-            # 设置止损（不使用reduce_only参数）
+            # 设置止损（positionSide已足够，无需reduce_only）
             self.binance.create_futures_order(
                 symbol=symbol,
                 side='SELL',
@@ -459,7 +543,7 @@ class AITradingEngine:
                 stopPrice=stop_loss
             )
 
-            # 设置止盈（不使用reduce_only参数）
+            # 设置止盈（positionSide已足够，无需reduce_only）
             self.binance.create_futures_order(
                 symbol=symbol,
                 side='SELL',
@@ -491,11 +575,46 @@ class AITradingEngine:
                             stop_loss_pct: float, take_profit_pct: float) -> Dict:
         """开空单"""
         try:
+            # 获取当前价格（需要先获取价格才能计算杠杆）
+            current_price = self.market_analyzer.get_current_price(symbol)
+
+            # 🔧 智能杠杆调整：同时满足币安名义价值和精度要求
+            # 先确定精度规则
+            if 'BTC' in symbol:
+                precision = 3  # BTC: 0.001
+                min_qty = 0.001
+            elif 'ETH' in symbol:
+                precision = 3  # ETH: 0.001
+                min_qty = 0.001
+            elif 'BNB' in symbol:
+                precision = 1  # BNB: 0.1
+                min_qty = 0.1
+            elif 'SOL' in symbol:
+                precision = 1  # SOL: 0.1
+                min_qty = 0.1
+            elif 'DOGE' in symbol:
+                precision = 0  # DOGE: 整数
+                min_qty = 1.0
+            else:
+                precision = 1  # 默认: 0.1
+                min_qty = 0.1
+
+            # 计算满足精度要求所需的最小名义价值
+            min_notional_for_precision = min_qty * current_price
+            min_notional = max(20, min_notional_for_precision)  # 至少$20，或满足精度要求
+
+            # 计算所需杠杆
+            required_leverage = int(min_notional / amount) + 1
+            original_leverage = leverage
+            leverage = min(max(leverage, required_leverage), 25)  # 最大25倍
+
+            if leverage != original_leverage:
+                self.logger.info(f"💡 [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
+                               f"(名义价值 ${amount*original_leverage:.2f} → ${amount*leverage:.2f}, "
+                               f"精度要求: ≥{min_qty} {symbol.replace('USDT', '')})")
+
             # 设置杠杆
             self.binance.set_leverage(symbol, leverage)
-
-            # 获取当前价格
-            current_price = self.market_analyzer.get_current_price(symbol)
 
             # 计算数量并按交易对调整精度
             raw_quantity = (amount * leverage) / current_price
@@ -532,7 +651,7 @@ class AITradingEngine:
                 position_side='SHORT'
             )
 
-            # 设置止损（不使用reduce_only参数）
+            # 设置止损（positionSide已足够，无需reduce_only）
             self.binance.create_futures_order(
                 symbol=symbol,
                 side='BUY',
@@ -542,7 +661,7 @@ class AITradingEngine:
                 stopPrice=stop_loss
             )
 
-            # 设置止盈（不使用reduce_only参数）
+            # 设置止盈（positionSide已足够，无需reduce_only）
             self.binance.create_futures_order(
                 symbol=symbol,
                 side='BUY',
