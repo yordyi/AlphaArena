@@ -186,7 +186,7 @@ export function MarketTicker({ symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT'] }: Ma
       {lastUpdate && (
         <div className="mt-4 pt-4 border-t border-glass-border flex items-center justify-between text-xs text-gray-500">
           <div>
-            最后更新: {lastUpdate.toLocaleTimeString('zh-CN', { hour12: false })}
+            最后更新: {String(lastUpdate.getHours()).padStart(2, '0')}:{String(lastUpdate.getMinutes()).padStart(2, '0')}:{String(lastUpdate.getSeconds()).padStart(2, '0')}
           </div>
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></div>

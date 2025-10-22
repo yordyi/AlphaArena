@@ -7,7 +7,7 @@ import { PositionsTable } from '@/components/PositionsTable'
 import { AIDecisions } from '@/components/AIDecisions'
 import { TradesHistory } from '@/components/TradesHistory'
 import { MarketTicker } from '@/components/MarketTicker'
-import { CandlestickChart } from '@/components/CandlestickChart'
+import { CandlestickChartWrapper } from '@/components/CandlestickChartWrapper'
 import { usePerformanceWS } from '@/hooks/usePerformanceWS'
 import { usePositionsWS } from '@/hooks/usePositionsWS'
 import { useDecisionsWS } from '@/hooks/useDecisionsWS'
@@ -159,7 +159,7 @@ export default function Home() {
         <div className="grid grid-cols-3 gap-6 mb-6">
           {/* Left Column - Candlestick Chart + Positions */}
           <div className="col-span-2 space-y-6">
-            <CandlestickChart symbol="BTCUSDT" initialInterval="5m" />
+            <CandlestickChartWrapper symbol="BTCUSDT" initialInterval="5m" />
             <PositionsTable positions={positions} />
           </div>
 
