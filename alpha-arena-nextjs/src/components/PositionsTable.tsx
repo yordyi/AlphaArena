@@ -84,7 +84,12 @@ export function PositionsTable({ positions }: PositionsTableProps) {
           {/* 表体 */}
           <tbody>
             {positions.map((position, index) => {
-              const isProfit = position.unrealized_pnl >= 0
+              // 兼容API返回的字段名：pnl_usd, pnl_pct, quantity
+              const pnl = (position as any).pnl_usd ?? (position as any).unrealized_pnl ?? 0
+              const pnlPct = (position as any).pnl_pct ?? (position as any).unrealized_pnl_pct ?? 0
+              const size = (position as any).quantity ?? (position as any).size ?? 0
+
+              const isProfit = pnl >= 0
               const pnlColor = isProfit ? 'text-success' : 'text-danger'
               const pnlBgColor = isProfit ? 'bg-success/10' : 'bg-danger/10'
               const pnlBorderColor = isProfit ? 'border-success/30' : 'border-danger/30'
@@ -121,7 +126,7 @@ export function PositionsTable({ positions }: PositionsTableProps) {
 
                   {/* 数量 */}
                   <td className="text-right py-4 px-4 text-gray-300 font-medium">
-                    {position.size.toFixed(4)}
+                    {size.toFixed(4)}
                   </td>
 
                   {/* 开仓价 */}
@@ -140,11 +145,11 @@ export function PositionsTable({ positions }: PositionsTableProps) {
                   <td className="text-right py-4 px-4">
                     <div className="inline-flex flex-col items-end">
                       <span className={`font-bold text-lg ${pnlColor}`}>
-                        {isProfit ? '+' : ''}${Math.abs(position.unrealized_pnl).toFixed(2)}
+                        {isProfit ? '+' : ''}${Math.abs(pnl).toFixed(2)}
                       </span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${pnlColor} ${pnlBgColor} border ${pnlBorderColor} mt-1`}>
                         {isProfit ? '↑' : '↓'}
-                        {Math.abs(position.unrealized_pnl_pct).toFixed(2)}%
+                        {Math.abs(pnlPct).toFixed(2)}%
                       </span>
                     </div>
                   </td>
@@ -171,11 +176,11 @@ export function PositionsTable({ positions }: PositionsTableProps) {
           <div className="text-gray-400">
             总盈亏:
             <span className={`ml-2 font-bold ${
-              positions.reduce((sum, p) => sum + p.unrealized_pnl, 0) >= 0
+              positions.reduce((sum, p: any) => sum + (p.pnl_usd ?? p.unrealized_pnl ?? 0), 0) >= 0
                 ? 'text-success'
                 : 'text-danger'
             }`}>
-              ${positions.reduce((sum, p) => sum + p.unrealized_pnl, 0).toFixed(2)}
+              ${positions.reduce((sum, p: any) => sum + (p.pnl_usd ?? p.unrealized_pnl ?? 0), 0).toFixed(2)}
             </span>
           </div>
         </div>

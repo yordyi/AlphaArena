@@ -26,15 +26,15 @@ export default function Home() {
         const result = await response.json()
         if (result.success && result.data) {
           // 转换数据格式：取最近100个点
-          const formattedData = result.data.slice(-100).map((item: any) => ({
-            time: new Date(item.time).toLocaleTimeString('zh-CN', {
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit'
-            }),
-            value: item.value
-          }))
+          const formattedData = result.data.slice(-100).map((item: any) => {
+            const date = new Date(item.time)
+            // 手动格式化避免 toLocaleTimeString 的问题
+            const time = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+            return {
+              time,
+              value: item.value
+            }
+          })
           setChartData(formattedData)
         }
       } catch (error) {
