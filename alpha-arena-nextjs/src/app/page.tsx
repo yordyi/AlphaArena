@@ -5,6 +5,9 @@ import { StatCard } from '@/components/StatCard'
 import { PerformanceChart } from '@/components/PerformanceChart'
 import { PositionsTable } from '@/components/PositionsTable'
 import { AIDecisions } from '@/components/AIDecisions'
+import { TradesHistory } from '@/components/TradesHistory'
+import { MarketTicker } from '@/components/MarketTicker'
+import { CandlestickChart } from '@/components/CandlestickChart'
 import { usePerformanceWS } from '@/hooks/usePerformanceWS'
 import { usePositionsWS } from '@/hooks/usePositionsWS'
 import { useDecisionsWS } from '@/hooks/useDecisionsWS'
@@ -89,6 +92,11 @@ export default function Home() {
           </p>
         </div>
 
+        {/* Real-time Market Ticker - Binance WebSocket */}
+        <div className="mb-6">
+          <MarketTicker symbols={['BTCUSDT', 'ETHUSDT', 'BNBUSDT']} />
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-4 gap-3 mb-6">
           <StatCard
@@ -148,18 +156,22 @@ export default function Home() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-3 gap-6">
-          {/* Left Column - Chart + Positions */}
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          {/* Left Column - Candlestick Chart + Positions */}
           <div className="col-span-2 space-y-6">
-            <PerformanceChart data={chartData} />
+            <CandlestickChart symbol="BTCUSDT" initialInterval="5m" />
             <PositionsTable positions={positions} />
           </div>
 
-          {/* Right Column - AI Decisions */}
-          <div>
+          {/* Right Column - Performance + AI Decisions */}
+          <div className="space-y-6">
+            <PerformanceChart data={chartData} />
             <AIDecisions decisions={decisions} />
           </div>
         </div>
+
+        {/* Trades History - Full Width */}
+        <TradesHistory maxItems={50} />
 
         {/* Success Notice - WebSocket */}
         <div className="mt-6 glass-card p-4 border-l-4 border-success">
