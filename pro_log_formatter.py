@@ -54,6 +54,9 @@ class ProTradingFormatter(logging.Formatter):
         'BG_GREEN': '\033[42m',
         'BG_YELLOW': '\033[43m',
         'BG_BLUE': '\033[44m',
+
+        # DeepSeek 专属品牌色 RGB(41, 148, 255)
+        'DEEPSEEK_BLUE': '\033[38;2;41;148;255m',
     }
 
     # 模块名映射（专业化显示）
@@ -177,11 +180,11 @@ class ProTradingFormatter(logging.Formatter):
 
         if self.compact:
             # 紧凑格式：HH:MM:SS.fff | MODULE | 消息
-            # DeepSeek专属蓝色显示
+            # DeepSeek专属品牌蓝色显示 RGB(41, 148, 255)
             prefix = (
                 f"{self.COLORS['BRIGHT_BLACK']}{timestamp}{self.COLORS['RESET']} "
                 f"{self.COLORS['DIM']}|{self.COLORS['RESET']} "
-                f"{self.COLORS['BRIGHT_BLUE']}{module:<8}{self.COLORS['RESET']} "
+                f"{self.COLORS['DEEPSEEK_BLUE']}{module:<8}{self.COLORS['RESET']} "
                 f"{level_color}{level_symbol}{self.COLORS['RESET']} "
             )
             formatted = prefix + message
