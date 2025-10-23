@@ -58,8 +58,8 @@ class ProTradingFormatter(logging.Formatter):
 
     # 模块名映射（专业化显示）
     MODULE_NAMES = {
-        '__main__': 'BOT',
-        'alpha_arena_bot': 'BOT',
+        '__main__': 'DeepSeek',
+        'alpha_arena_bot': 'DeepSeek',
         'ai_trading_engine': 'AI-ENGINE',
         'deepseek_client': 'AI-MODEL',
         'binance_client': 'EXCHANGE',
@@ -177,10 +177,11 @@ class ProTradingFormatter(logging.Formatter):
 
         if self.compact:
             # 紧凑格式：HH:MM:SS.fff | MODULE | 消息
+            # DeepSeek专属蓝色显示
             prefix = (
                 f"{self.COLORS['BRIGHT_BLACK']}{timestamp}{self.COLORS['RESET']} "
                 f"{self.COLORS['DIM']}|{self.COLORS['RESET']} "
-                f"{self.COLORS['BRIGHT_CYAN']}{module:<10}{self.COLORS['RESET']} "
+                f"{self.COLORS['BRIGHT_BLUE']}{module:<8}{self.COLORS['RESET']} "
                 f"{level_color}{level_symbol}{self.COLORS['RESET']} "
             )
             formatted = prefix + message

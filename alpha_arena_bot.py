@@ -242,6 +242,12 @@ class AlphaArenaBot:
 
             margin_usage_pct = (total_margin_used / balance * 100) if balance > 0 else 0
 
+            # 计算平均杠杆倍数
+            avg_leverage = 0
+            if positions:
+                leverages = [float(pos.get('leverage', 1)) for pos in positions if float(pos.get('positionAmt', 0)) != 0]
+                avg_leverage = sum(leverages) / len(leverages) if leverages else 0
+
             # 计算盈亏比（如果有交易历史）
             if hasattr(self.performance, 'trades') and len(self.performance.trades) > 0:
                 winning_trades = [t for t in self.performance.trades if t.get('pnl', 0) > 0]
@@ -261,7 +267,10 @@ class AlphaArenaBot:
             if should_display:
                 # 显示增强的账户信息
                 self.logger.info(f"\n[ACCOUNT] 账户状态:")
-                self.logger.info(f"  余额: ${balance:,.2f}  |  持仓数: {len(positions)}  |  保证金使用: {margin_usage_pct:.1f}%")
+                if avg_leverage > 0:
+                    self.logger.info(f"  余额: ${balance:,.2f}  |  持仓数: {len(positions)}  |  杠杆: {avg_leverage:.0f}x  |  保证金使用: {margin_usage_pct:.1f}%")
+                else:
+                    self.logger.info(f"  余额: ${balance:,.2f}  |  持仓数: {len(positions)}  |  保证金使用: {margin_usage_pct:.1f}%")
                 self.logger.info(f"  未实现盈亏: ${unrealized_pnl:,.2f}  |  总价值: ${total_value:,.2f}  |  总收益率: {metrics['total_return_pct']:+.2f}%")
 
                 # 显示性能指标
