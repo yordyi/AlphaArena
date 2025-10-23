@@ -15,13 +15,23 @@ from binance_client import BinanceClient
 from market_analyzer import MarketAnalyzer
 from risk_manager import RiskManager
 from advanced_position_manager import AdvancedPositionManager
+from trailing_stop_manager import TrailingStopManager
+
+# 增强功能：运行状态和增强决策引擎
+try:
+    from runtime_state_manager import RuntimeStateManager
+    from enhanced_decision_engine import EnhancedDecisionEngine
+    ENHANCED_FEATURES_AVAILABLE = True
+except ImportError:
+    ENHANCED_FEATURES_AVAILABLE = False
 
 
 class AITradingEngine:
     """AI 交易引擎"""
 
     def __init__(self, deepseek_api_key: str, binance_client: BinanceClient,
-                 market_analyzer: MarketAnalyzer, risk_manager: RiskManager):
+                 market_analyzer: MarketAnalyzer, risk_manager: RiskManager,
+                 enable_enhanced_features: bool = True):
         """
         初始化 AI 交易引擎
 
@@ -30,6 +40,7 @@ class AITradingEngine:
             binance_client: Binance 客户端
             market_analyzer: 市场分析器
             risk_manager: 风险管理器
+            enable_enhanced_features: 是否启用增强功能（运行状态追踪、丰富市场数据）
         """
         self.deepseek = DeepSeekClient(deepseek_api_key)
         self.binance = binance_client
@@ -42,6 +53,10 @@ class AITradingEngine:
         # 高级仓位管理器
         self.adv_position_manager = AdvancedPositionManager(binance_client, market_analyzer)
 
+        # [NEW] ATR动态追踪止损管理器
+        self.trailing_stop_manager = TrailingStopManager(atr_multiplier=2.0)
+        self.logger.info("[OK] ATR动态止损管理器已启用（ATR倍数: 2.0x）")
+
         # 交易冷却期 (symbol -> timestamp)
         # 防止在短时间内重复尝试失败的交易
         self.trade_cooldown = {}
@@ -52,6 +67,26 @@ class AITradingEngine:
         # Reasoner模型: 每300秒深度分析（重大决策）
         self.last_reasoner_time = 0
         self.reasoner_interval = 600  # 10分钟执行一次Reasoner（降低成本）
+
+        # [NEW] 增强功能初始化
+        self.enhanced_features_enabled = enable_enhanced_features and ENHANCED_FEATURES_AVAILABLE
+        if self.enhanced_features_enabled:
+            try:
+                self.runtime_manager = RuntimeStateManager()
+                self.enhanced_engine = EnhancedDecisionEngine(
+                    binance_client,
+                    market_analyzer,
+                    self.runtime_manager
+                )
+                self.logger.info("[OK] 增强功能已启用（运行状态追踪、丰富市场数据）")
+            except Exception as e:
+                self.logger.warning(f"[WARNING] 增强功能初始化失败，使用标准模式: {e}")
+                self.enhanced_features_enabled = False
+        else:
+            if not ENHANCED_FEATURES_AVAILABLE:
+                self.logger.info("ℹ️ 增强功能模块不可用，使用标准模式")
+            self.runtime_manager = None
+            self.enhanced_engine = None
 
     def analyze_and_trade(self, symbol: str, max_position_pct: float = 10.0) -> Dict:
         """
@@ -65,6 +100,11 @@ class AITradingEngine:
             交易结果
         """
         try:
+            # [NEW] 0a. 更新运行状态（如果启用了增强功能）
+            if self.enhanced_features_enabled and self.runtime_manager:
+                self.runtime_manager.update_runtime()
+                self.runtime_manager.increment_trading_loops()
+
             # 0. 检查冷却期（防止重复尝试失败的交易）
             current_time = time.time()
             if symbol in self.trade_cooldown:
@@ -78,19 +118,25 @@ class AITradingEngine:
                         'reason': f'冷却期中（还需{remaining//60}分钟）'
                     }
 
-            # 1. 检查最近胜率（仅记录，不阻止交易）
-            recent_win_rate = self._calculate_recent_win_rate(n=5)
+            # 1. 检查最近胜率（仅在有足够交易历史时显示）
             if len(self.trade_history) >= 5:
+                recent_win_rate = self._calculate_recent_win_rate(n=5)
                 if recent_win_rate < 0.4:
-                    self.logger.warning(f"[{symbol}] ⚠️  近5笔胜率较低: {recent_win_rate*100:.1f}% - AI将根据这个信息自主决策")
+                    self.logger.warning(f"[{symbol}] [WARNING] 近5笔胜率较低: {recent_win_rate*100:.1f}% - AI将根据这个信息自主决策")
                 elif recent_win_rate > 0.6:
-                    self.logger.info(f"[{symbol}] ✅ 近5笔胜率良好: {recent_win_rate*100:.1f}%")
+                    self.logger.info(f"[{symbol}] [INFO] 近5笔胜率良好: {recent_win_rate*100:.1f}%")
                 else:
-                    self.logger.info(f"[{symbol}] 📊 近5笔胜率: {recent_win_rate*100:.1f}%")
+                    self.logger.info(f"[{symbol}] [INFO] 近5笔胜率: {recent_win_rate*100:.1f}%")
 
             # 2. 收集市场数据
             self.logger.info(f"[{symbol}] 开始分析...")
-            market_data = self._gather_market_data(symbol)
+
+            # [NEW] 如果启用了增强功能，使用MarketAnalyzer获取完整市场上下文
+            if self.enhanced_features_enabled and self.market_analyzer:
+                market_data = self.market_analyzer.get_comprehensive_market_context(symbol)
+                self.logger.debug(f"[{symbol}] [OK] 使用增强市场数据（包含历史序列、4h上下文、资金费率、持仓量）")
+            else:
+                market_data = self._gather_market_data(symbol)
 
             # 2. 获取账户信息
             account_info = self._get_account_info()
@@ -100,19 +146,23 @@ class AITradingEngine:
             use_reasoner = self._should_use_reasoner(symbol, market_data, account_info)
 
             if use_reasoner:
-                self.logger.info(f"[{symbol}] 🧠 调用 DeepSeek Reasoner 推理模型...")
+                self.logger.info(f"[{symbol}] [深度分析] 调用 DeepSeek Chat V3.1...")
                 ai_result = self.deepseek.analyze_with_reasoning(
                     market_data=market_data,
                     account_info=account_info,
                     trade_history=self.trade_history[-10:]
                 )
             else:
-                self.logger.info(f"[{symbol}] 💬 调用 DeepSeek Chat 日常模型...")
+                self.logger.info(f"[{symbol}] [快速分析] 调用 DeepSeek Chat V3.1...")
                 ai_result = self.deepseek.analyze_market_and_decide(
                     market_data,
                     account_info,
                     self.trade_history
                 )
+
+            # [NEW] AI调用后更新计数
+            if self.enhanced_features_enabled and self.runtime_manager:
+                self.runtime_manager.increment_ai_calls()
 
             if not ai_result['success']:
                 return {
@@ -128,9 +178,9 @@ class AITradingEngine:
             self.logger.info(f"[{symbol}] AI决策 ({model_used}): {decision['action']} (信心度: {decision['confidence']}%)")
             self.logger.info(f"[{symbol}] 理由: {decision['reasoning']}")
             if reasoning_content:
-                self.logger.info(f"[{symbol}] 🧠 推理过程: {reasoning_content[:300]}...")
+                self.logger.info(f"[{symbol}] [AI-THINK] 推理过程: {reasoning_content[:300]}...")
 
-            # 4. ✅ 完全信任AI决策，不设置信心阈值
+            # 4. [OK] 完全信任AI决策，不设置信心阈值
             # DeepSeek会根据自己的判断决定信心度，我们完全尊重AI的自主权
 
             # 执行交易
@@ -172,7 +222,7 @@ class AITradingEngine:
         try:
             from datetime import datetime, timezone
 
-            self.logger.info(f"[{symbol}] 🔍 AI评估持仓...")
+            self.logger.info(f"[{symbol}] [SEARCH] AI评估持仓...")
 
             # 获取市场数据
             market_data = self._gather_market_data(symbol)
@@ -347,14 +397,14 @@ class AITradingEngine:
             交易结果
         """
         action = decision['action']
-        # ✅ 完全由DeepSeek决定！所有参数都由AI自主决策
+        # [OK] 完全由DeepSeek决定！所有参数都由AI自主决策
         # fallback值仅在AI未返回时使用（理论上不应该发生）
         position_size_pct = min(decision.get('position_size', 1), max_position_pct)  # AI未返回时用最保守的1%
 
         # 杠杆：由AI自主决定，不设默认值
         leverage = decision.get('leverage')
         if leverage is None:
-            self.logger.error(f"❌ AI未返回杠杆建议，跳过此次交易")
+            self.logger.error(f"[ERROR] AI未返回杠杆建议，跳过此次交易")
             return {'success': False, 'error': 'AI未返回杠杆建议'}
 
         leverage = int(leverage)
@@ -362,10 +412,10 @@ class AITradingEngine:
         # 🔒 杠杆上限 - 最大20倍（与DeepSeek提示词保持一致）
         MAX_LEVERAGE = 20
         if leverage > MAX_LEVERAGE:
-            self.logger.warning(f"⚠️ AI建议杠杆{leverage}x超过上限{MAX_LEVERAGE}x，已强制降至{MAX_LEVERAGE}x")
+            self.logger.warning(f"[WARNING] AI建议杠杆{leverage}x超过上限{MAX_LEVERAGE}x，已强制降至{MAX_LEVERAGE}x")
             leverage = MAX_LEVERAGE
         elif leverage < 1:
-            self.logger.warning(f"⚠️ AI建议杠杆{leverage}x过低，已强制调至1x")
+            self.logger.warning(f"[WARNING] AI建议杠杆{leverage}x过低，已强制调至1x")
             leverage = 1
 
         stop_loss_pct = decision.get('stop_loss_pct', 1) / 100  # AI未返回时最保守1%止损
@@ -411,7 +461,7 @@ class AITradingEngine:
                 # 3. 执行平仓
                 if close_percentage < 100:
                     # 部分平仓
-                    self.logger.info(f"📊 [{symbol}] 执行部分平仓: {close_percentage}%, 方向: {position_side}")
+                    self.logger.info(f"[ANALYZE] [{symbol}] 执行部分平仓: {close_percentage}%, 方向: {position_side}")
                     result = self.binance.close_position_partial(
                         symbol,
                         percentage=close_percentage,
@@ -419,14 +469,14 @@ class AITradingEngine:
                     )
                 else:
                     # 全部平仓
-                    self.logger.info(f"📊 [{symbol}] 执行全部平仓, 方向: {position_side}")
+                    self.logger.info(f"[ANALYZE] [{symbol}] 执行全部平仓, 方向: {position_side}")
                     result = self.binance.close_position(symbol, position_side=position_side)
 
                 # 4. 检查平仓是否真的成功
                 success = 'orderId' in result or 'clientOrderId' in result
 
                 if not success and result.get('msg') == 'No position to close':
-                    self.logger.warning(f"⚠️ [{symbol}] 没有持仓可平仓")
+                    self.logger.warning(f"[WARNING] [{symbol}] 没有持仓可平仓")
                     return {'success': False, 'action': action, 'error': '没有持仓'}
 
                 # 5. 平仓成功后取消所有止损止盈订单
@@ -436,9 +486,9 @@ class AITradingEngine:
                         if cancel_result.get('success'):
                             cancelled_count = cancel_result.get('cancelled_count', 0)
                             if cancelled_count > 0:
-                                self.logger.info(f"✅ [{symbol}] 已自动取消 {cancelled_count} 个止损止盈挂单")
+                                self.logger.info(f"[OK] [{symbol}] 已自动取消 {cancelled_count} 个止损止盈挂单")
                     except Exception as e:
-                        self.logger.warning(f"⚠️ [{symbol}] 取消挂单失败（不影响平仓）: {e}")
+                        self.logger.warning(f"[WARNING] [{symbol}] 取消挂单失败（不影响平仓）: {e}")
 
                 return {'success': success, 'action': action, 'result': result}
 
@@ -446,7 +496,7 @@ class AITradingEngine:
                 return {'success': True, 'action': 'HOLD'}
 
             else:
-                self.logger.error(f"❌ 未知操作: {action}")
+                self.logger.error(f"[ERROR] 未知操作: {action}")
                 return {'success': False, 'error': f'未知操作: {action}'}
 
         except Exception as e:
@@ -460,7 +510,7 @@ class AITradingEngine:
             # 获取当前价格（需要先获取价格才能计算杠杆）
             current_price = self.market_analyzer.get_current_price(symbol)
 
-            # 🔧 智能杠杆调整：同时满足币安名义价值和精度要求
+            # [CONFIG] 智能杠杆调整：同时满足币安名义价值和精度要求
             # 先确定精度规则
             if 'BTC' in symbol:
                 precision = 3  # BTC: 0.001
@@ -491,7 +541,7 @@ class AITradingEngine:
             leverage = min(max(leverage, required_leverage), 25)  # 最大25倍
 
             if leverage != original_leverage:
-                self.logger.info(f"💡 [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
+                self.logger.info(f"[IDEA] [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
                                f"(名义价值 ${amount*original_leverage:.2f} → ${amount*leverage:.2f}, "
                                f"精度要求: ≥{min_qty} {symbol.replace('USDT', '')})")
 
@@ -553,7 +603,7 @@ class AITradingEngine:
                 stopPrice=take_profit
             )
 
-            self.logger.info(f"✅ 开多单成功: {symbol}, 数量: {quantity}, 杠杆: {leverage}x, 止损: {stop_loss}, 止盈: {take_profit}")
+            self.logger.info(f"[OK] 开多单成功: {symbol}, 数量: {quantity}, 杠杆: {leverage}x, 止损: {stop_loss}, 止盈: {take_profit}")
 
             return {
                 'success': True,
@@ -568,7 +618,7 @@ class AITradingEngine:
             }
 
         except Exception as e:
-            self.logger.error(f"❌ 开多单失败: {e}")
+            self.logger.error(f"[ERROR] 开多单失败: {e}")
             return {'success': False, 'error': str(e)}
 
     def _open_short_position(self, symbol: str, amount: float, leverage: int,
@@ -578,7 +628,7 @@ class AITradingEngine:
             # 获取当前价格（需要先获取价格才能计算杠杆）
             current_price = self.market_analyzer.get_current_price(symbol)
 
-            # 🔧 智能杠杆调整：同时满足币安名义价值和精度要求
+            # [CONFIG] 智能杠杆调整：同时满足币安名义价值和精度要求
             # 先确定精度规则
             if 'BTC' in symbol:
                 precision = 3  # BTC: 0.001
@@ -609,7 +659,7 @@ class AITradingEngine:
             leverage = min(max(leverage, required_leverage), 25)  # 最大25倍
 
             if leverage != original_leverage:
-                self.logger.info(f"💡 [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
+                self.logger.info(f"[IDEA] [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
                                f"(名义价值 ${amount*original_leverage:.2f} → ${amount*leverage:.2f}, "
                                f"精度要求: ≥{min_qty} {symbol.replace('USDT', '')})")
 
@@ -671,7 +721,7 @@ class AITradingEngine:
                 stopPrice=take_profit
             )
 
-            self.logger.info(f"✅ 开空单成功: {symbol}, 数量: {quantity}, 杠杆: {leverage}x, 止损: {stop_loss}, 止盈: {take_profit}")
+            self.logger.info(f"[OK] 开空单成功: {symbol}, 数量: {quantity}, 杠杆: {leverage}x, 止损: {stop_loss}, 止盈: {take_profit}")
 
             return {
                 'success': True,
@@ -686,7 +736,7 @@ class AITradingEngine:
             }
 
         except Exception as e:
-            self.logger.error(f"❌ 开空单失败: {e}")
+            self.logger.error(f"[ERROR] 开空单失败: {e}")
             return {'success': False, 'error': str(e)}
 
     def _record_trade(self, symbol: str, decision: Dict, trade_result: Dict):
@@ -799,7 +849,7 @@ class AITradingEngine:
         # 条件0：时间触发 - 每300秒执行一次Reasoner深度分析
         if current_time - self.last_reasoner_time >= self.reasoner_interval:
             self.last_reasoner_time = current_time
-            self.logger.info(f"[{symbol}] ⏰ 定时深度分析（每5分钟） → 使用推理模型")
+            self.logger.info(f"[{symbol}] [定时] 10分钟深度分析 - 使用 DeepSeek Chat V3.1")
             return True
 
         # 条件1：开仓决策使用推理模型（最重要）
@@ -817,13 +867,13 @@ class AITradingEngine:
         if not has_position:
             # 开仓决策也更新Reasoner时间戳，避免重复深度分析
             self.last_reasoner_time = current_time
-            self.logger.info(f"[{symbol}] ✅ 开仓决策 → 使用推理模型")
+            self.logger.info(f"[{symbol}] [开仓决策] 深度分析 - 使用 DeepSeek Chat V3.1")
             return True
         
         # 条件2：重大市场变化（24h波动>5%）
         price_change_24h = abs(market_data.get('price_change_24h', 0))
         if price_change_24h > 5:
-            self.logger.info(f"[{symbol}] ✅ 重大市场变化({price_change_24h:.1f}%) → 使用推理模型")
+            self.logger.info(f"[{symbol}] [重大市场变化 {price_change_24h:.1f}%] 深度分析 - 使用 DeepSeek Chat V3.1")
             return True
         
         # 条件3：连续亏损（近3笔全亏）
@@ -831,7 +881,7 @@ class AITradingEngine:
             recent_3 = self.trade_history[-3:]
             all_loss = all(t.get('pnl', 0) < 0 for t in recent_3)
             if all_loss:
-                self.logger.info(f"[{symbol}] ✅ 连续亏损 → 使用推理模型深度分析")
+                self.logger.info(f"[{symbol}] [连续亏损] 深度分析 - 使用 DeepSeek Chat V3.1")
                 return True
         
         # 条件4：账户回撤较大（>10%）
@@ -839,15 +889,15 @@ class AITradingEngine:
         current_balance = account_info.get('balance', 100)
         drawdown_pct = ((initial_balance - current_balance) / initial_balance * 100) if initial_balance > 0 else 0
         if drawdown_pct > 10:
-            self.logger.info(f"[{symbol}] ✅ 账户回撤({drawdown_pct:.1f}%) → 使用推理模型")
+            self.logger.info(f"[{symbol}] [账户回撤 {drawdown_pct:.1f}%] 深度分析 - 使用 DeepSeek Chat V3.1")
             return True
         
         # 条件5：高胜率时可使用推理模型优化策略
         recent_win_rate = self._calculate_recent_win_rate(n=5)
         if recent_win_rate > 0.7:
-            self.logger.info(f"[{symbol}] ✅ 高胜率({recent_win_rate*100:.0f}%) → 使用推理模型优化")
+            self.logger.info(f"[{symbol}] [高胜率 {recent_win_rate*100:.0f}%] 深度分析优化 - 使用 DeepSeek Chat V3.1")
             return True
         
-        # 其他情况：使用日常模型（持仓评估、常规监控）
-        self.logger.info(f"[{symbol}] 💬 常规评估 → 使用日常模型")
+        # 其他情况：快速分析（持仓评估、常规监控）
+        self.logger.info(f"[{symbol}] [常规评估] 快速分析 - DeepSeek Chat V3.1")
         return False

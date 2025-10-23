@@ -866,6 +866,41 @@ class BinanceClient:
         result = self.get_funding_rate(symbol=symbol, limit=1)
         return result[0] if result else {}
 
+    def get_open_interest(self, symbol: str) -> Dict:
+        """
+        获取合约持仓量（Open Interest）
+
+        Args:
+            symbol: 交易对（如 'BTCUSDT'）
+
+        Returns:
+            包含持仓量数据的字典：
+            - openInterest: 持仓量
+            - symbol: 交易对
+            - time: 时间戳
+        """
+        params = {'symbol': symbol}
+        return self._request('GET', '/fapi/v1/openInterest', params=params, futures=True)
+
+    def get_open_interest_statistics(self, symbol: str, period: str = '5m', limit: int = 30) -> List[Dict]:
+        """
+        获取合约持仓量历史统计
+
+        Args:
+            symbol: 交易对
+            period: 时间周期 (5m/15m/30m/1h/2h/4h/6h/12h/1d)
+            limit: 返回数量 (默认30，最大500)
+
+        Returns:
+            持仓量历史数据列表
+        """
+        params = {
+            'symbol': symbol,
+            'period': period,
+            'limit': limit
+        }
+        return self._request('GET', '/futures/data/openInterestHist', params=params, futures=True)
+
     def set_position_mode(self, dual_side_position: bool) -> Dict:
         """
         设置持仓模式
@@ -909,6 +944,19 @@ class BinanceClient:
         if symbol:
             params['symbol'] = symbol
         return self._request('GET', '/fapi/v1/exchangeInfo', params=params, futures=True)
+
+    def get_futures_24h_ticker(self, symbol: str) -> Dict:
+        """
+        获取合约24小时价格统计
+
+        Args:
+            symbol: 交易对
+
+        Returns:
+            24小时统计数据
+        """
+        params = {'symbol': symbol}
+        return self._request('GET', '/fapi/v1/ticker/24hr', params=params, futures=True)
 
     def get_spot_exchange_info(self, symbol: str = None) -> Dict:
         """获取现货交易规则和交易对信息"""

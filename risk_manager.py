@@ -352,16 +352,95 @@ class RiskManager:
         risk = self.assess_position_risk(position, current_price)
 
         if risk.risk_level == RiskLevel.CRITICAL:
-            return f"⚠️ 紧急：建议立即平仓 {risk.symbol}，当前亏损 {risk.unrealized_pnl_percent:.2f}%"
+            return f"[WARNING] 紧急：建议立即平仓 {risk.symbol}，当前亏损 {risk.unrealized_pnl_percent:.2f}%"
 
         if risk.risk_level == RiskLevel.HIGH:
-            return f"⚠️ 警告：{risk.symbol} 风险偏高，考虑减仓或设置止损"
+            return f"[WARNING] 警告：{risk.symbol} 风险偏高，考虑减仓或设置止损"
 
         if risk.risk_level == RiskLevel.MEDIUM:
             return f"ℹ️ 注意：{risk.symbol} 需要关注，建议设置移动止损"
 
         # 盈利建议
         if risk.unrealized_pnl_percent > 20:
-            return f"✅ {risk.symbol} 盈利丰厚 ({risk.unrealized_pnl_percent:.2f}%)，建议部分止盈"
+            return f"[OK] {risk.symbol} 盈利丰厚 ({risk.unrealized_pnl_percent:.2f}%)，建议部分止盈"
 
         return None
+
+    def check_liquidation_risk(self, positions: List[Dict],
+                               liquidation_threshold: float = 0.03) -> List[Dict]:
+        """
+        检查清算风险预警
+
+        Args:
+            positions: 持仓列表（来自Binance API）
+            liquidation_threshold: 清算价预警阈值（默认3% = 0.03）
+
+        Returns:
+            预警列表，包含：
+            - symbol: 交易对
+            - side: 持仓方向 (LONG/SHORT)
+            - current_price: 当前价格
+            - liquidation_price: 清算价
+            - distance_pct: 距离清算价百分比
+            - risk_level: 风险等级 (CRITICAL/HIGH)
+            - message: 预警消息
+        """
+        warnings = []
+
+        for position in positions:
+            # 只检查有持仓的合约
+            position_amt = float(position.get('positionAmt', 0))
+            if position_amt == 0:
+                continue
+
+            current_price = float(position.get('markPrice', 0))
+            liquidation_price = float(position.get('liquidationPrice', 0))
+
+            # 如果没有清算价数据，跳过
+            if liquidation_price == 0 or current_price == 0:
+                continue
+
+            # 判断持仓方向
+            side = 'LONG' if position_amt > 0 else 'SHORT'
+
+            # 计算距离清算价的百分比
+            if side == 'LONG':
+                # 多仓：当前价 > 清算价，距离 = (当前价 - 清算价) / 当前价
+                distance_pct = (current_price - liquidation_price) / current_price
+            else:  # SHORT
+                # 空仓：当前价 < 清算价，距离 = (清算价 - 当前价) / 当前价
+                distance_pct = (liquidation_price - current_price) / current_price
+
+            # 只有在接近清算价时才预警（距离为正且小于等于阈值）
+            if 0 < distance_pct <= liquidation_threshold:
+                # 风险等级分类
+                if distance_pct <= 0.01:  # 1%以内：危急
+                    risk_level = 'CRITICAL'
+                    emoji = '🚨'
+                elif distance_pct <= 0.02:  # 2%以内：非常高
+                    risk_level = 'HIGH'
+                    emoji = '[WARNING]'
+                else:  # 3%以内：高
+                    risk_level = 'MEDIUM'
+                    emoji = '⚡'
+
+                warning = {
+                    'symbol': position['symbol'],
+                    'side': side,
+                    'current_price': round(current_price, 2),
+                    'liquidation_price': round(liquidation_price, 2),
+                    'distance_pct': round(distance_pct * 100, 2),
+                    'risk_level': risk_level,
+                    'message': f"{emoji} {position['symbol']} {side}仓距离清算价仅剩 {distance_pct*100:.2f}%",
+                    'timestamp': datetime.now().isoformat()
+                }
+
+                warnings.append(warning)
+
+        # 按风险等级和距离排序（最危险的在前）
+        warnings.sort(key=lambda x: (
+            0 if x['risk_level'] == 'CRITICAL' else (1 if x['risk_level'] == 'HIGH' else 2),
+            x['distance_pct']
+        ))
+
+        return warnings

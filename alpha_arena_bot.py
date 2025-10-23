@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Alpha Arena 交易机器人
+DeepSeek Ai Trade Bot
 永不停机的 AI 驱动量化交易系统
 """
 
@@ -18,10 +18,11 @@ from market_analyzer import MarketAnalyzer
 from risk_manager import RiskManager
 from ai_trading_engine import AITradingEngine
 from performance_tracker import PerformanceTracker
+from pro_log_formatter import ProTradingFormatter
 
 
 class AlphaArenaBot:
-    """Alpha Arena 交易机器人"""
+    """DeepSeek Ai Trade Bot"""
 
     def __init__(self):
         """初始化机器人"""
@@ -37,28 +38,41 @@ class AlphaArenaBot:
         # 运行标志
         self.running = True
 
+        # 账户信息显示时间控制（每120秒显示一次）
+        self.last_account_display_time = 0
+        self.account_display_interval = 120  # 秒
+
         # 设置信号处理
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-        self.logger.info("🚀 Alpha Arena Bot 初始化完成")
+        self.logger.info("[SYSTEM] DeepSeek Ai Trade Bot 初始化完成")
 
     def _setup_logging(self):
         """设置日志"""
         # 创建 logs 目录
         os.makedirs('logs', exist_ok=True)
 
-        # 配置日志
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(f'logs/alpha_arena_{datetime.now().strftime("%Y%m%d")}.log'),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-
+        # 创建logger
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        self.logger.handlers = []  # 清除现有handlers
+
+        # 文件日志handler（不带颜色）
+        file_handler = logging.FileHandler(f'logs/alpha_arena_{datetime.now().strftime("%Y%m%d")}.log')
+        file_handler.setLevel(logging.INFO)
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+
+        # 控制台日志handler（专业交易终端格式）
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.INFO)
+        console_formatter = ProTradingFormatter(compact=True)
+        console_handler.setFormatter(console_formatter)
+
+        # 添加handlers
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
 
     def _load_config(self):
         """加载配置"""
@@ -94,6 +108,17 @@ class AlphaArenaBot:
             testnet=self.testnet
         )
 
+        # [NEW] 从Binance API获取实际账户余额，替代配置文件中的初始资金
+        try:
+            actual_balance = self.binance.get_futures_usdt_balance()
+            self.logger.info(f"[OK] 实际余额: ${actual_balance:,.2f}")
+            # 使用实际余额替代配置文件值
+            self.initial_capital = actual_balance
+        except Exception as e:
+            self.logger.warning(f"[WARNING] 无法获取Binance余额，使用配置文件值: {e}")
+            # 回退到配置文件值
+            pass
+
         # 市场分析器
         self.market_analyzer = MarketAnalyzer(self.binance)
 
@@ -119,7 +144,7 @@ class AlphaArenaBot:
             risk_manager=self.risk_manager
         )
 
-        # 性能追踪器
+        # 性能追踪器（使用实际余额）
         self.performance = PerformanceTracker(
             initial_capital=self.initial_capital,
             data_file='performance_data.json'
@@ -133,11 +158,11 @@ class AlphaArenaBot:
     def run_forever(self):
         """永久运行主循环"""
         self.logger.info("=" * 60)
-        self.logger.info("🏆 Alpha Arena Trading Bot 启动")
-        self.logger.info(f"💰 初始资金: ${self.initial_capital:,.2f}")
-        self.logger.info(f"📊 交易对: {', '.join(self.trading_symbols)}")
-        self.logger.info(f"⏱️  交易间隔: {self.trading_interval}秒")
-        self.logger.info(f"🤖 AI 模型: DeepSeek-V3")
+        self.logger.info("[SUCCESS] DeepSeek Ai Trade Bot 启动")
+        self.logger.info(f"[MONEY] 账户余额: ${self.initial_capital:,.2f}")
+        self.logger.info(f"[ANALYZE] 交易对: {', '.join(self.trading_symbols)}")
+        self.logger.info(f"[TIME]  交易间隔: {self.trading_interval}秒")
+        self.logger.info(f"[AI] AI 模型: DeepSeek Chat V3.1")
         self.logger.info("=" * 60)
 
         cycle_count = 0
@@ -146,8 +171,8 @@ class AlphaArenaBot:
             try:
                 cycle_count += 1
                 self.logger.info(f"\n{'='*60}")
-                self.logger.info(f"🔄 开始第 {cycle_count} 轮交易循环")
-                self.logger.info(f"🕐 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                self.logger.info(f"[LOOP] 开始第 {cycle_count} 轮交易循环")
+                self.logger.info(f"[TIME] 时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 self.logger.info(f"{'='*60}")
 
                 # 1. 更新账户状态
@@ -160,20 +185,20 @@ class AlphaArenaBot:
                     # 短暂延迟避免 API 限流
                     time.sleep(2)
 
-                # 3. 显示性能摘要
-                self._display_performance()
+                # 3. 显示性能摘要 (已禁用 - 用户要求去掉)
+                # self._display_performance()
 
                 # 4. 等待下一轮
-                self.logger.info(f"\n⏳ 等待 {self.trading_interval} 秒后开始下一轮...")
+                self.logger.info(f"\n[WAIT] 等待 {self.trading_interval} 秒后开始下一轮...")
                 time.sleep(self.trading_interval)
 
             except KeyboardInterrupt:
-                self.logger.info("\n⚠️  检测到键盘中断，正在关闭...")
+                self.logger.info("\n[WARNING]  检测到键盘中断，正在关闭...")
                 break
 
             except Exception as e:
-                self.logger.error(f"❌ 主循环错误: {e}")
-                self.logger.error(f"⏳ 60秒后重试...")
+                self.logger.error(f"[ERROR] 主循环错误: {e}")
+                self.logger.error(f"[WAIT] 60秒后重试...")
                 time.sleep(60)
 
         self._shutdown()
@@ -181,11 +206,18 @@ class AlphaArenaBot:
     def _update_account_status(self):
         """更新账户状态"""
         try:
+            # 测量API延迟
+            import time as time_module
+            start_time = time_module.time()
+
             # 获取余额
             balance = self.binance.get_futures_usdt_balance()
 
             # 获取持仓
             positions = self.binance.get_active_positions()
+
+            # 计算API延迟
+            api_latency_ms = int((time_module.time() - start_time) * 1000)
 
             # 计算总价值
             unrealized_pnl = sum(float(pos.get('unRealizedProfit', 0)) for pos in positions)
@@ -197,12 +229,64 @@ class AlphaArenaBot:
             # 计算并显示指标
             metrics = self.performance.calculate_metrics(balance, positions)
 
-            self.logger.info(f"\n💼 账户状态:")
-            self.logger.info(f"  余额: ${balance:,.2f}")
-            self.logger.info(f"  持仓数: {len(positions)}")
-            self.logger.info(f"  未实现盈亏: ${unrealized_pnl:,.2f}")
-            self.logger.info(f"  总价值: ${total_value:,.2f}")
-            self.logger.info(f"  总收益率: {metrics['total_return_pct']:+.2f}%")
+            # 计算保证金使用率
+            total_margin_used = 0
+            for pos in positions:
+                pos_amt = abs(float(pos.get('positionAmt', 0)))
+                entry_price = float(pos.get('entryPrice', 0))
+                leverage = float(pos.get('leverage', 1))
+                if pos_amt > 0 and entry_price > 0:
+                    notional = pos_amt * entry_price
+                    margin = notional / leverage
+                    total_margin_used += margin
+
+            margin_usage_pct = (total_margin_used / balance * 100) if balance > 0 else 0
+
+            # 计算盈亏比（如果有交易历史）
+            if hasattr(self.performance, 'trades') and len(self.performance.trades) > 0:
+                winning_trades = [t for t in self.performance.trades if t.get('pnl', 0) > 0]
+                losing_trades = [t for t in self.performance.trades if t.get('pnl', 0) < 0]
+
+                avg_win = sum(t.get('pnl', 0) for t in winning_trades) / len(winning_trades) if winning_trades else 0
+                avg_loss = abs(sum(t.get('pnl', 0) for t in losing_trades) / len(losing_trades)) if losing_trades else 1
+
+                profit_factor = avg_win / avg_loss if avg_loss > 0 else 0
+            else:
+                profit_factor = 0
+
+            # 检查是否需要显示账户信息（每120秒显示一次）
+            current_time = time.time()
+            should_display = (current_time - self.last_account_display_time) >= self.account_display_interval
+
+            if should_display:
+                # 显示增强的账户信息
+                self.logger.info(f"\n[ACCOUNT] 账户状态:")
+                self.logger.info(f"  余额: ${balance:,.2f}  |  持仓数: {len(positions)}  |  保证金使用: {margin_usage_pct:.1f}%")
+                self.logger.info(f"  未实现盈亏: ${unrealized_pnl:,.2f}  |  总价值: ${total_value:,.2f}  |  总收益率: {metrics['total_return_pct']:+.2f}%")
+
+                # 显示性能指标
+                if profit_factor > 0:
+                    self.logger.info(f"  [PERF] 盈亏比: {profit_factor:.2f}  |  最大回撤: {metrics.get('max_drawdown_pct', 0):.2f}%  |  胜率: {metrics.get('win_rate', 0):.1f}%")
+
+                # [NEW] 清算价预警检查
+                if positions:
+                    liquidation_warnings = self.risk_manager.check_liquidation_risk(
+                        positions,
+                        liquidation_threshold=0.03  # 3% 预警阈值
+                    )
+
+                    if liquidation_warnings:
+                        self.logger.warning(f"\n[WARNING]  检测到 {len(liquidation_warnings)} 个清算风险预警:")
+                        for warning in liquidation_warnings:
+                            self.logger.warning(f"  {warning['message']}")
+                            self.logger.warning(
+                                f"    当前价: ${warning['current_price']:,.2f} | "
+                                f"清算价: ${warning['liquidation_price']:,.2f} | "
+                                f"距离: {warning['distance_pct']:.2f}%"
+                            )
+
+                # 更新显示时间
+                self.last_account_display_time = current_time
 
         except Exception as e:
             self.logger.error(f"更新账户状态失败: {e}")
@@ -215,7 +299,30 @@ class AlphaArenaBot:
             symbol: 交易对
         """
         try:
-            self.logger.info(f"\n📊 分析 {symbol}...")
+            # 获取实时市场数据
+            import time as time_module
+            start_time = time_module.time()
+
+            # 获取当前价格和24h数据
+            try:
+                ticker = self.binance.get_futures_24h_ticker(symbol=symbol)
+                current_price = float(ticker.get('lastPrice', 0))
+                price_change_24h = float(ticker.get('priceChangePercent', 0))
+                volume_24h = float(ticker.get('volume', 0))
+                quote_volume_24h = float(ticker.get('quoteVolume', 0)) / 1_000_000  # 转换为百万
+
+                # 计算API延迟
+                market_data_latency_ms = int((time_module.time() - start_time) * 1000)
+
+                # 显示市场数据
+                self.logger.info(f"\n[ANALYZE] {symbol} 市场数据:")
+                self.logger.info(
+                    f"  价格: ${current_price:,.4f}  {price_change_24h:+.2f}%  |  "
+                    f"24h成交: ${quote_volume_24h:.1f}M"
+                )
+            except Exception as e:
+                self.logger.warning(f"  [WARNING] 获取市场数据失败: {e}")
+                # 继续执行，使用基本分析
 
             # 检查是否已有持仓
             positions = self.binance.get_active_positions()
@@ -226,8 +333,8 @@ class AlphaArenaBot:
                     break
 
             if existing_position:
-                # ✅ 新功能: 让AI评估是否应该平仓
-                self.logger.info(f"  🔍 {symbol} 已有持仓，让AI评估是否平仓...")
+                # [OK] 新功能: 让AI评估是否应该平仓
+                self.logger.info(f"  [SEARCH] {symbol} 已有持仓，让AI评估是否平仓...")
 
                 result = self.ai_engine.analyze_position_for_closing(
                     symbol=symbol,
@@ -241,11 +348,11 @@ class AlphaArenaBot:
                     # 保存AI的持仓评估决策
                     self._save_ai_decision(symbol, ai_decision, result)
 
-                    # ✅ 完全信任AI决策，不设置信心阈值
+                    # [OK] 完全信任AI决策，不设置信心阈值
                     if action in ['CLOSE', 'CLOSE_LONG', 'CLOSE_SHORT']:
                         self.logger.info(f"  ✂️  AI决定平仓 {symbol}")
-                        self.logger.info(f"  💡 理由: {ai_decision.get('reasoning', '')}")
-                        self.logger.info(f"  🎯 信心度: {ai_decision.get('confidence', 0)}%")
+                        self.logger.info(f"  [IDEA] 理由: {ai_decision.get('reasoning', '')}")
+                        self.logger.info(f"  [TARGET] 信心度: {ai_decision.get('confidence', 0)}%")
 
                         # 获取当前市场价格（平仓价）
                         try:
@@ -277,14 +384,14 @@ class AlphaArenaBot:
                         })
 
                         if pnl > 0:
-                            self.logger.info(f"  ✅ 平仓成功 - 盈利 ${pnl:.2f}")
+                            self.logger.info(f"  [OK] 平仓成功 - 盈利 ${pnl:.2f}")
                         else:
-                            self.logger.info(f"  ✅ 平仓成功 - 亏损 ${pnl:.2f}")
+                            self.logger.info(f"  [OK] 平仓成功 - 亏损 ${pnl:.2f}")
                     else:
-                        self.logger.info(f"  ✅ AI建议继续持有 {symbol} (信心度: {ai_decision.get('confidence', 0)}%)")
-                        self.logger.info(f"  💡 理由: {ai_decision.get('reasoning', '')}")
+                        self.logger.info(f"  [OK] AI建议继续持有 {symbol} (信心度: {ai_decision.get('confidence', 0)}%)")
+                        self.logger.info(f"  [IDEA] 理由: {ai_decision.get('reasoning', '')}")
                 else:
-                    self.logger.error(f"  ❌ 持仓评估失败: {result.get('error')}")
+                    self.logger.error(f"  [ERROR] 持仓评估失败: {result.get('error')}")
 
                 return  # 处理完持仓后返回
 
@@ -301,6 +408,9 @@ class AlphaArenaBot:
                 # 保存所有AI决策（包括HOLD）到文件供仪表板显示
                 self._save_ai_decision(symbol, ai_decision, result.get('trade_result', {}))
 
+                # 获取AI的叙述性决策说明（优先使用narrative，其次reasoning）
+                narrative = ai_decision.get('narrative', ai_decision.get('reasoning', ''))
+
                 if action in ['BUY', 'SELL', 'OPEN_LONG', 'OPEN_SHORT']:
                     # 记录交易
                     trade_info = result['trade_result']
@@ -309,13 +419,15 @@ class AlphaArenaBot:
 
                     self.performance.record_trade(trade_info)
 
-                    self.logger.info(f"  ✅ {action}: {symbol}")
-                    self.logger.info(f"  💡 理由: {trade_info['reasoning']}")
+                    self.logger.info(f"\n[AI] DEEPSEEK CHAT V3.1 决策:")
+                    self.logger.info(f"  {narrative}")
                 else:
-                    self.logger.info(f"  ⏸️  {action}")
+                    # HOLD决策 - 显示叙述性说明
+                    self.logger.info(f"\n[AI] DEEPSEEK CHAT V3.1 决策:")
+                    self.logger.info(f"  {narrative}")
 
             else:
-                self.logger.error(f"  ❌ 交易失败: {result.get('error')}")
+                self.logger.error(f"  [ERROR] 交易失败: {result.get('error')}")
 
         except Exception as e:
             self.logger.error(f"处理 {symbol} 失败: {e}")
@@ -354,7 +466,7 @@ class AlphaArenaBot:
                 'timestamp': datetime.now().isoformat(),
                 'cycle': len(decisions) + 1,
 
-                # 📊 账户快照
+                # [ANALYZE] 账户快照
                 'account_snapshot': {
                     'total_value': round(total_value, 2),
                     'cash_balance': round(balance, 2),
@@ -363,7 +475,7 @@ class AlphaArenaBot:
                     'unrealized_pnl': round(unrealized_pnl, 2)
                 },
 
-                # 🎯 本次决策详情
+                # [TARGET] 本次决策详情
                 'decision': {
                     'symbol': symbol,
                     'action': decision.get('action', 'HOLD'),
@@ -377,7 +489,7 @@ class AlphaArenaBot:
                     'error': trade_result.get('error', None)
                 },
 
-                # ⏰ 交易时段
+                # [TIMER] 交易时段
                 'session_info': {
                     'session': session_info['session'],
                     'volatility': session_info['volatility'],
@@ -385,7 +497,7 @@ class AlphaArenaBot:
                     'aggressive_mode': session_info['aggressive_mode']
                 },
 
-                # 💼 持仓快照（如果是持仓决策）
+                # [ACCOUNT] 持仓快照（如果是持仓决策）
                 'position_snapshot': None
             }
 
@@ -431,7 +543,7 @@ class AlphaArenaBot:
 
     def _shutdown(self):
         """关闭机器人"""
-        self.logger.info("\n🛑 Alpha Arena Bot 正在关闭...")
+        self.logger.info("\n🛑 DeepSeek Ai Trade Bot 正在关闭...")
 
         try:
             # 显示最终表现
@@ -440,7 +552,7 @@ class AlphaArenaBot:
             # 保存数据
             self.logger.info("💾 保存数据...")
 
-            self.logger.info("✅ 关闭完成")
+            self.logger.info("[OK] 关闭完成")
 
         except Exception as e:
             self.logger.error(f"关闭过程出错: {e}")
@@ -454,9 +566,9 @@ def main():
     print("""
     ╔══════════════════════════════════════════════════════════╗
     ║                                                          ║
-    ║         🏆 ALPHA ARENA - DeepSeek-V3 Trading Bot        ║
+    ║            [SUCCESS] DEEPSEEK AI 交易机器人 - V3.1       ║
     ║                                                          ║
-    ║      Inspired by nof1.ai's Alpha Arena Experiment       ║
+    ║         灵感来自 nof1.ai 的 Alpha Arena 实验            ║
     ║                                                          ║
     ║         永不停机的 AI 量化交易系统                         ║
     ║                                                          ║

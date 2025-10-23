@@ -16,6 +16,7 @@ import time
 # 导入 Binance 客户端
 from binance_client import BinanceClient
 from performance_tracker import PerformanceTracker
+from risk_manager import RiskManager
 
 # 加载环境变量
 load_dotenv()
@@ -29,10 +30,11 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 # 初始化 Binance 客户端（全局单例）
 binance_client = None
 performance_tracker = None
+risk_manager = None
 
 def init_clients():
     """初始化客户端（延迟加载）"""
-    global binance_client, performance_tracker
+    global binance_client, performance_tracker, risk_manager
 
     if binance_client is None:
         api_key = os.getenv('BINANCE_API_KEY')
@@ -46,11 +48,30 @@ def init_clients():
         )
 
     if performance_tracker is None:
-        initial_capital = float(os.getenv('INITIAL_CAPITAL', 10000))
+        # [NEW] 从Binance API获取实际余额，替代配置文件
+        try:
+            initial_capital = binance_client.get_futures_usdt_balance()
+            print(f"[OK] Web仪表板: 从Binance API获取实际余额: ${initial_capital:,.2f}")
+        except Exception as e:
+            print(f"[WARNING] 无法获取Binance余额，使用配置文件默认值: {e}")
+            initial_capital = float(os.getenv('INITIAL_CAPITAL', 10000))
+
         performance_tracker = PerformanceTracker(
             initial_capital=initial_capital,
             data_file='performance_data.json'
         )
+
+    if risk_manager is None:
+        # 初始化风险管理器
+        risk_config = {
+            'max_portfolio_risk': 0.02,
+            'max_position_size': 0.1,
+            'max_leverage': 10,
+            'max_drawdown': 0.15,
+            'max_daily_loss': 0.05,
+            'max_open_positions': 10
+        }
+        risk_manager = RiskManager(risk_config)
 
 
 @app.route('/')
@@ -181,6 +202,53 @@ def get_chart_data():
         })
 
 
+@app.route('/api/system_status')
+def get_system_status():
+    """获取系统运行状态 API"""
+    try:
+        # 读取runtime_state.json
+        with open('runtime_state.json', 'r') as f:
+            runtime_state = json.load(f)
+
+        # 格式化运行时间
+        runtime_minutes = runtime_state.get('total_runtime_minutes', 0)
+        if runtime_minutes >= 60:
+            runtime_display = f"{runtime_minutes // 60}小时{runtime_minutes % 60}分"
+        else:
+            runtime_display = f"{runtime_minutes}分钟"
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'runtime_minutes': runtime_minutes,
+                'runtime_display': runtime_display,
+                'ai_calls': runtime_state.get('total_ai_calls', 0),
+                'trading_loops': runtime_state.get('total_trading_loops', 0),
+                'session_start': runtime_state.get('session_start_time', ''),
+                'last_update': runtime_state.get('last_update_timestamp', datetime.now().isoformat())
+            }
+        })
+
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'error': '运行状态文件不存在',
+            'data': {
+                'runtime_minutes': 0,
+                'runtime_display': '0分钟',
+                'ai_calls': 0,
+                'trading_loops': 0,
+                'session_start': '',
+                'last_update': datetime.now().isoformat()
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'获取系统状态失败: {str(e)}'
+        })
+
+
 @app.route('/api/positions')
 def get_positions():
     """获取当前持仓 API - 实时从 Binance 获取"""
@@ -300,8 +368,8 @@ def get_ai_decisions():
                         decision['reasoning'] = reason_match.group(1).strip()
 
                 # 读取推理过程（如果有）
-                if i + 2 < len(lines) and '🧠 推理过程:' in lines[i + 2]:
-                    reasoning_match = re.search(r'🧠 推理过程:\s*(.+)$', lines[i + 2])
+                if i + 2 < len(lines) and '[AI-THINK] 推理过程:' in lines[i + 2]:
+                    reasoning_match = re.search(r'[AI-THINK] 推理过程:\s*(.+)$', lines[i + 2])
                     if reasoning_match:
                         decision['reasoning_content'] = reasoning_match.group(1).strip()
 
@@ -327,6 +395,44 @@ def get_ai_decisions():
         })
 
 
+@app.route('/api/liquidation_warnings')
+def get_liquidation_warnings():
+    """获取清算风险预警 API"""
+    try:
+        # 初始化客户端
+        init_clients()
+
+        # 获取当前持仓
+        positions = binance_client.get_active_positions()
+
+        # 检查清算风险
+        warnings = risk_manager.check_liquidation_risk(
+            positions,
+            liquidation_threshold=0.03  # 3% 预警阈值
+        )
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'warnings': warnings,
+                'count': len(warnings),
+                'has_critical': any(w['risk_level'] == 'CRITICAL' for w in warnings),
+                'last_check': datetime.now().isoformat()
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'data': {
+                'warnings': [],
+                'count': 0,
+                'has_critical': False
+            }
+        })
+
+
 # ==================== WebSocket 事件处理 ====================
 
 @socketio.on('connect')
@@ -339,7 +445,7 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     """客户端断开"""
-    print(f'❌ 客户端已断开')
+    print(f'[ERROR] 客户端已断开')
 
 
 # 后台推送线程：每500ms推送一次实时数据（延迟<100ms感知）
@@ -424,7 +530,7 @@ def background_push_thread():
             })
 
         except Exception as e:
-            print(f"⚠️  推送数据错误: {e}")
+            print(f"[WARNING]  推送数据错误: {e}")
 
         # 每500ms推送一次（感知延迟<100ms）
         time.sleep(0.5)
@@ -434,8 +540,8 @@ if __name__ == '__main__':
     # 创建 templates 目录
     os.makedirs('templates', exist_ok=True)
 
-    print("🌐 启动 Web 仪表板...")
-    print("📊 访问: http://localhost:5001")
+    print("[WEB] 启动 Web 仪表板...")
+    print("[ANALYZE] 访问: http://localhost:5001")
     print("⚡ WebSocket 实时推送已启用（延迟 <100ms）")
 
     # 启动后台推送线程
