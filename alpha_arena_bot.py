@@ -9,7 +9,7 @@ import sys
 import time
 import logging
 from datetime import datetime
-from typing import List
+from typing import List, Dict
 import signal
 
 # 导入模块
@@ -41,6 +41,10 @@ class AlphaArenaBot:
         # 账户信息显示时间控制（每120秒显示一次）
         self.last_account_display_time = 0
         self.account_display_interval = 120  # 秒
+
+        # [NEW] 系统运行统计（每次重启后重新计数）
+        self.start_time = datetime.now()
+        self.total_invocations = 0  # AI调用总次数
 
         # 设置信号处理
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -126,7 +130,7 @@ class AlphaArenaBot:
         risk_config = {
             'max_portfolio_risk': 0.02,
             'max_position_size': self.max_position_pct / 100,
-            'max_leverage': 20,  # 统一为20倍，与AI决策范围一致
+            'max_leverage': 30,  # 统一为30倍，与AI决策范围一致
             'default_stop_loss_pct': 0.015,  # 1.5%止损，与交易策略一致
             'default_take_profit_pct': 0.05,  # 5%止盈
             'max_drawdown': 0.15,
@@ -345,10 +349,17 @@ class AlphaArenaBot:
                 # [OK] 新功能: 让AI评估是否应该平仓
                 self.logger.info(f"  [SEARCH] {symbol} 已有持仓，让AI评估是否平仓...")
 
+                # [NEW] 获取运行统计并传递给AI引擎
+                runtime_stats = self.get_runtime_stats()
+
                 result = self.ai_engine.analyze_position_for_closing(
                     symbol=symbol,
-                    position=existing_position
+                    position=existing_position,
+                    runtime_stats=runtime_stats
                 )
+
+                # [NEW] 递增AI调用计数
+                self.total_invocations += 1
 
                 if result['success']:
                     ai_decision = result.get('decision', {})
@@ -396,6 +407,24 @@ class AlphaArenaBot:
                             self.logger.info(f"  [OK] 平仓成功 - 盈利 ${pnl:.2f}")
                         else:
                             self.logger.info(f"  [OK] 平仓成功 - 亏损 ${pnl:.2f}")
+
+                    elif action == 'ROLL':
+                        # [NEW] 执行浮盈滚仓策略
+                        self.logger.info(f"  🔄 AI决定执行滚仓策略 {symbol}")
+                        self.logger.info(f"  [IDEA] 理由: {ai_decision.get('reasoning', '')}")
+                        self.logger.info(f"  [TARGET] 信心度: {ai_decision.get('confidence', 0)}%")
+
+                        roll_result = self.execute_roll_strategy(
+                            symbol=symbol,
+                            position=existing_position,
+                            decision=ai_decision
+                        )
+
+                        if roll_result['success']:
+                            self.logger.info(f"  [SUCCESS] 滚仓策略执行成功")
+                        else:
+                            self.logger.warning(f"  [WARNING] 滚仓策略执行失败: {roll_result.get('reason', '未知原因')}")
+
                     else:
                         self.logger.info(f"  [OK] AI建议继续持有 {symbol} (信心度: {ai_decision.get('confidence', 0)}%)")
                         self.logger.info(f"  [IDEA] 理由: {ai_decision.get('reasoning', '')}")
@@ -405,10 +434,17 @@ class AlphaArenaBot:
                 return  # 处理完持仓后返回
 
             # AI 分析和交易（仅在无持仓时）
+            # [NEW] 获取运行统计并传递给AI引擎
+            runtime_stats = self.get_runtime_stats()
+
             result = self.ai_engine.analyze_and_trade(
                 symbol=symbol,
-                max_position_pct=self.max_position_pct
+                max_position_pct=self.max_position_pct,
+                runtime_stats=runtime_stats
             )
+
+            # [NEW] 递增AI调用计数
+            self.total_invocations += 1
 
             if result['success']:
                 action = result.get('trade_result', {}).get('action', 'HOLD')
@@ -549,6 +585,175 @@ class AlphaArenaBot:
             print(summary)
         except Exception as e:
             self.logger.error(f"显示性能摘要失败: {e}")
+
+    def get_runtime_stats(self) -> dict:
+        """
+        获取系统运行统计信息
+
+        Returns:
+            包含运行时长和AI调用次数的字典
+        """
+        runtime_delta = datetime.now() - self.start_time
+        runtime_minutes = int(runtime_delta.total_seconds() / 60)
+
+        return {
+            'start_time': self.start_time.isoformat(),
+            'current_time': datetime.now().isoformat(),
+            'runtime_minutes': runtime_minutes,
+            'total_invocations': self.total_invocations
+        }
+
+    def execute_roll_strategy(self, symbol: str, position: Dict, decision: Dict) -> Dict:
+        """
+        执行浮盈滚仓策略
+
+        Args:
+            symbol: 交易对
+            position: 当前持仓信息
+            decision: AI决策信息（包含leverage、reinvest_pct等）
+
+        Returns:
+            执行结果
+        """
+        try:
+            self.logger.info(f"\n🔄 [ROLL] 开始执行浮盈滚仓策略: {symbol}")
+
+            # 1. 验证当前浮盈是否达到阈值
+            unrealized_pnl = float(position.get('unRealizedProfit', 0))
+            account_balance = self.binance.get_futures_usdt_balance()
+            account_value = account_balance + unrealized_pnl
+
+            profit_ratio = (unrealized_pnl / account_value) * 100 if account_value > 0 else 0
+            threshold_pct = decision.get('profit_threshold_pct', 10.0)
+
+            self.logger.info(f"  [DATA] 账户总价值: ${account_value:.2f}")
+            self.logger.info(f"  [DATA] 未实现盈亏: ${unrealized_pnl:.2f}")
+            self.logger.info(f"  [DATA] 浮盈比例: {profit_ratio:.2f}% (阈值: {threshold_pct:.2f}%)")
+
+            if profit_ratio < threshold_pct:
+                self.logger.warning(f"  [WARNING] 浮盈未达到阈值，不执行滚仓")
+                return {
+                    'success': False,
+                    'reason': f'浮盈比例{profit_ratio:.2f}%未达到阈值{threshold_pct:.2f}%'
+                }
+
+            # 2. 平掉当前盈利仓位，锁定利润
+            self.logger.info(f"  [STEP 1] 平仓锁定利润...")
+            entry_price = float(position.get('entryPrice', 0))
+
+            try:
+                close_price = self.market_analyzer.get_current_price(symbol)
+            except Exception:
+                close_price = float(position.get('markPrice', 0))
+
+            close_result = self.binance.close_position(symbol)
+
+            if not close_result:
+                self.logger.error(f"  [ERROR] 平仓失败")
+                return {'success': False, 'reason': '平仓失败'}
+
+            # 记录平仓并计算实际盈亏
+            realized_profit = self.performance.record_trade_close(
+                symbol=symbol,
+                close_price=close_price,
+                position_info=position
+            )
+
+            self.logger.info(f"  [OK] 平仓成功 - 实现利润: ${realized_profit:.2f}")
+
+            # 记录平仓交易
+            self.performance.record_trade({
+                'symbol': symbol,
+                'action': 'CLOSE_FOR_ROLL',
+                'entry_price': entry_price,
+                'price': close_price,
+                'quantity': abs(float(position.get('positionAmt', 0))),
+                'leverage': int(position.get('leverage', 1)),
+                'confidence': decision.get('confidence', 0),
+                'reasoning': f"[ROLL] {decision.get('reasoning', '')}",
+                'pnl': realized_profit
+            })
+
+            # 3. 计算可用于再投资的金额
+            reinvest_pct = decision.get('reinvest_pct', 40.0)  # 默认使用40%盈利
+            reinvest_pct = max(30.0, min(50.0, reinvest_pct))  # 限制在30-50%之间
+
+            reinvest_amount = realized_profit * (reinvest_pct / 100.0)
+
+            self.logger.info(f"  [STEP 2] 使用{reinvest_pct:.1f}%利润再投资: ${reinvest_amount:.2f}")
+
+            # 4. 使用AI指定的杠杆开新仓位
+            new_leverage = decision.get('leverage', 10)
+            new_leverage = max(1, min(30, new_leverage))  # 限制在1-30x
+
+            # 获取当前价格
+            current_price = self.market_analyzer.get_current_price(symbol)
+
+            # 计算开仓数量（考虑杠杆）
+            position_quantity = (reinvest_amount * new_leverage) / current_price
+
+            # 币安最小开仓量检查（通常BTC最小0.001）
+            min_quantity = 0.001
+            if position_quantity < min_quantity:
+                self.logger.warning(f"  [WARNING] 开仓数量{position_quantity:.6f}小于最小量{min_quantity}，调整至最小量")
+                position_quantity = min_quantity
+
+            self.logger.info(f"  [STEP 3] 开新仓位...")
+            self.logger.info(f"  [DATA] 杠杆: {new_leverage}x")
+            self.logger.info(f"  [DATA] 数量: {position_quantity:.6f}")
+            self.logger.info(f"  [DATA] 价格: ${current_price:.2f}")
+
+            # 设置杠杆
+            self.binance.set_leverage(symbol, new_leverage)
+
+            # 根据原持仓方向决定新仓位方向（或者按AI决策）
+            # 这里简化处理：保持同方向
+            position_side = float(position.get('positionAmt', 0))
+            side = 'LONG' if position_side > 0 else 'SHORT'
+
+            # 开仓
+            if side == 'LONG':
+                open_result = self.binance.open_long(symbol, position_quantity, new_leverage)
+            else:
+                open_result = self.binance.open_short(symbol, position_quantity, new_leverage)
+
+            if open_result:
+                self.logger.info(f"  [OK] 新仓位开仓成功")
+
+                # 记录开仓交易
+                self.performance.record_trade({
+                    'symbol': symbol,
+                    'action': f'OPEN_{side}_ROLL',
+                    'entry_price': current_price,
+                    'price': current_price,
+                    'quantity': position_quantity,
+                    'leverage': new_leverage,
+                    'confidence': decision.get('confidence', 0),
+                    'reasoning': f"[ROLL] 使用${reinvest_amount:.2f}再投资({reinvest_pct:.1f}%盈利)",
+                    'pnl': None
+                })
+
+                self.logger.info(f"  [SUCCESS] 滚仓完成！")
+                self.logger.info(f"  原仓位利润: ${realized_profit:.2f}")
+                self.logger.info(f"  新仓位投入: ${reinvest_amount:.2f} ({reinvest_pct:.1f}%)")
+                self.logger.info(f"  保留利润: ${realized_profit - reinvest_amount:.2f}")
+
+                return {
+                    'success': True,
+                    'realized_profit': realized_profit,
+                    'reinvest_amount': reinvest_amount,
+                    'new_leverage': new_leverage,
+                    'new_position_quantity': position_quantity
+                }
+            else:
+                self.logger.error(f"  [ERROR] 新仓位开仓失败")
+                return {'success': False, 'reason': '新仓位开仓失败'}
+
+        except Exception as e:
+            self.logger.error(f"  [ERROR] 滚仓执行失败: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            return {'success': False, 'reason': str(e)}
 
     def _shutdown(self):
         """关闭机器人"""

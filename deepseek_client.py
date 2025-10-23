@@ -457,9 +457,9 @@ class DeepSeekClient:
 ═══════════════════════════════════════════════════════════
 [TARGET] **风险控制参数** (你当前回复中可以使用的参数):
 ═══════════════════════════════════════════════════════════
-- leverage: 杠杆倍数 (1-20x🔒，建议8-15x)
-  * V5.0铁律: 绝对不超过20x
-  * 小账户(<$50): 8-15x | 中账户($50-200): 8-12x | 大账户(>$200): 5-10x
+- leverage: 杠杆倍数 (1-30x🔒，建议8-20x)
+  * V6.0铁律: 绝对不超过30x
+  * 小账户(<$50): 10-20x | 中账户($50-200): 8-18x | 大账户(>$200): 5-15x
 - position_size: 仓位大小 (1-100%账户余额)
 - stop_loss_pct: 止损百分比 (1-10%，建议3%)
 - take_profit_pct: 止盈百分比 (2-20%，建议9%)
@@ -474,20 +474,37 @@ class DeepSeekClient:
 
 系统现已支持9种专业级仓位管理策略，可在你的决策中使用：
 
-### 1. [LOOP] ROLL - 滚仓（浮盈加仓）
-**用途**: 在强趋势中使用浮盈开新仓，实现复利增长
-**触发条件**:
-- 持仓浮盈≥10%
-- 趋势极强（连续突破关键阻力/支撑）
-- 波动率适中
+### 1. 🔄 [ROLL] - 浮盈滚仓（Profit Rolling）
+**核心理念**: 当浮盈达到阈值时，平仓锁定利润，使用盈利的30-50%开新仓位，实现复利增长
+
+**触发条件** (你自主判断是否执行):
+- **关键指标**: 持仓未实现盈亏 ≥ 账户总价值的10%
+  （计算公式：unrealized_pnl / account_value ≥ 0.10）
+- 趋势依然强劲（未出现反转信号）
+- 波动率适中（不在剧烈震荡中）
+- 市场深度充足（能顺利执行平仓和开新仓）
+
+**执行流程**:
+1. 平掉当前盈利仓位，锁定利润
+2. 使用已实现盈利的30-50%（你自主决定比例）开新仓位
+3. 新仓位可使用更高杠杆（建议10-20x，最高30x）
+4. 设置合理止损（建议2-5%）
+
 **决策格式**:
 {
   "action": "ROLL",
   "confidence": 85,
-  "reasoning": "BTC强势突破67000阻力，浮盈12%，适合滚仓",
-  "leverage": 2,
-  "profit_threshold_pct": 10.0
+  "reasoning": "BTC持续强势，浮盈已达账户总价值的12%，适合滚仓锁定利润并开新仓",
+  "leverage": 15,  // 新仓位杠杆（你自主决定，范围1-30x）
+  "profit_threshold_pct": 10.0,  // 触发阈值（默认10%）
+  "reinvest_pct": 40.0  // 使用盈利的40%开新仓（范围30-50%）
 }
+
+**重要提示**:
+- 这是**高级策略**，需要你综合判断市场、趋势、风险后自主决定
+- 不是强制执行，只有当你认为条件成熟时才使用
+- 滚仓可以多次执行，但每次都需要重新评估风险
+- 永远保持一部分利润作为安全垫
 
 ### 2. 📐 PYRAMID - 金字塔加仓
 **用途**: 价格回踩时递减加仓，降低平均成本
@@ -742,7 +759,7 @@ class DeepSeekClient:
     "position_size": 1-100,
     "stop_loss_pct": 1-10,
     "take_profit_pct": 2-20,
-    "leverage": 1-20
+    "leverage": 1-30
 }
 
 **narrative示例**:
@@ -971,81 +988,226 @@ class DeepSeekClient:
     def _build_trading_prompt(self, market_data: Dict,
                              account_info: Dict,
                              trade_history: List[Dict] = None) -> str:
-        """构建交易提示词（支持增强数据）"""
+        """构建交易提示词（nof1.ai风格，支持时间序列和完整上下文）"""
 
         # 获取当前交易时段
         session_info = self.get_trading_session()
 
-        prompt = f"""
-## 交易时段分析 [TIMER]
+        # [NEW] 数据排序警告 - 放在最开头
+        prompt = """
+⚠️ CRITICAL: ALL OF THE PRICE OR SIGNAL DATA BELOW IS ORDERED: OLDEST → NEWEST
+
+This means:
+- First value in array = earliest historical data point
+- Last value in array = most recent/current data point
+- You can observe trends by comparing values from left to right
+
+═══════════════════════════════════════════════════════════
+"""
+
+        # [NEW] 系统运行统计（如果可用）
+        runtime_stats = account_info.get('runtime_stats', {})
+        if runtime_stats and runtime_stats.get('total_invocations', 0) > 0:
+            prompt += f"""
+[SYSTEM] 系统运行统计
+═══════════════════════════════════════════════════════════
+运行时长: {runtime_stats.get('runtime_minutes', 0)} 分钟
+AI调用次数: {runtime_stats.get('total_invocations', 0)} 次
+启动时间: {runtime_stats.get('start_time', 'N/A')[:19]}
+当前时间: {runtime_stats.get('current_time', 'N/A')[:19]}
+
+═══════════════════════════════════════════════════════════
+"""
+
+        # 交易时段分析
+        prompt += f"""
+[TIMER] 交易时段分析
+═══════════════════════════════════════════════════════════
 当前时段: {session_info['session']} (北京时间{session_info['beijing_hour']}:00)
 市场波动性: {session_info['volatility'].upper()}
 时段建议: {session_info['recommendation']}
-{'[HOT] 欧美盘波动大，适合激进交易，可设置更高止盈目标(5-15%)' if session_info['aggressive_mode'] else '💤 亚洲盘波动小，建议观望或持有现有仓位'}
+{'🔥 欧美盘波动大，适合激进交易，可设置更高止盈目标(5-15%)' if session_info['aggressive_mode'] else '💤 亚洲盘波动小，建议观望或持有现有仓位'}
 
-## 市场数据 ({market_data.get('symbol', 'N/A')})
+═══════════════════════════════════════════════════════════
+[MARKET] 市场数据 ({market_data.get('symbol', 'N/A')})
+═══════════════════════════════════════════════════════════
 当前价格: ${market_data.get('current_price', 'N/A')}
 24h变化: {market_data.get('price_change_24h', 'N/A')}%
 24h成交量: ${market_data.get('volume_24h', 'N/A')}
 
-## 技术指标
+技术指标:
 RSI(14): {market_data.get('rsi', 'N/A')} {'[超卖]' if isinstance(market_data.get('rsi'), (int, float)) and market_data.get('rsi') < 30 else '[超买]' if isinstance(market_data.get('rsi'), (int, float)) and market_data.get('rsi') > 70 else ''}
 MACD: {market_data.get('macd', 'N/A')}
 布林带: {market_data.get('bollinger_bands', 'N/A')}
 均线: SMA20={market_data.get('sma_20', 'N/A')}, SMA50={market_data.get('sma_50', 'N/A')}
 ATR: {market_data.get('atr', 'N/A')}
 
-## 趋势分析
 趋势: {market_data.get('trend', 'N/A')}
 支撑位: {market_data.get('support_levels', [])}
 阻力位: {market_data.get('resistance_levels', [])}
 """
 
-        # [NEW] 添加增强数据（如果可用）
+        # [UPGRADED] 日内时间序列 - 优化展示格式
         if 'intraday_series' in market_data and market_data['intraday_series']:
             intraday = market_data['intraday_series']
+            mid_prices = intraday.get('mid_prices', [])[-10:]
+            ema20_values = intraday.get('ema20_values', [])[-10:]
+            macd_values = intraday.get('macd_values', [])[-10:]
+            rsi7_values = intraday.get('rsi7_values', [])[-10:]
+            rsi14_values = intraday.get('rsi14_values', [])[-10:]
+            timestamps = intraday.get('timestamps', [])[-10:]
+
             prompt += f"""
-## [ANALYZE] 日内时间序列 (3分钟间隔, 最近10个点)
-Mid Prices: {[f"{p:.2f}" for p in intraday.get('mid_prices', [])]}
-EMA20: {[f"{v:.2f}" for v in intraday.get('ema20_values', [])]}
-MACD: {[f"{v:.2f}" for v in intraday.get('macd_values', [])]}
-RSI(7): {[f"{v:.1f}" for v in intraday.get('rsi7_values', [])]}
+═══════════════════════════════════════════════════════════
+[ANALYZE] 日内时间序列数据 (3分钟K线, 最近10个数据点)
+ORDERING: OLDEST → NEWEST (观察从左到右的趋势变化)
+═══════════════════════════════════════════════════════════
+
+Timestamps:  {' | '.join([str(t)[-8:] for t in timestamps]) if timestamps else 'N/A'}
+
+Mid Prices:  {' → '.join([f"${p:.2f}" for p in mid_prices]) if mid_prices else 'N/A'}
+EMA20:       {' → '.join([f"${v:.2f}" for v in ema20_values]) if ema20_values else 'N/A'}
+MACD:        {' → '.join([f"{v:.2f}" for v in macd_values]) if macd_values else 'N/A'}
+RSI(7):      {' → '.join([f"{v:.1f}" for v in rsi7_values]) if rsi7_values else 'N/A'}
+RSI(14):     {' → '.join([f"{v:.1f}" for v in rsi14_values]) if rsi14_values else 'N/A'}
 """
 
+            # 添加趋势提示
+            if mid_prices and len(mid_prices) >= 2:
+                price_trend = '上涨📈' if mid_prices[-1] > mid_prices[0] else '下跌📉'
+                prompt += f"\n💡 价格趋势: {price_trend} ({mid_prices[0]:.2f} → {mid_prices[-1]:.2f})\n"
+
+            if macd_values and len(macd_values) >= 2:
+                macd_trend = '增强' if macd_values[-1] > macd_values[0] else '减弱'
+                prompt += f"💡 动量: {macd_trend}\n"
+
+        # [UPGRADED] 4小时级别宏观趋势 - 添加序列数据
         if 'long_term_context_4h' in market_data and market_data['long_term_context_4h']:
             ctx_4h = market_data['long_term_context_4h']
+            ema20 = ctx_4h.get('ema20', 0)
+            ema50 = ctx_4h.get('ema50', 0)
+
             prompt += f"""
-## [TREND-UP] 4小时级别上下文
-EMA20: {ctx_4h.get('ema20', 'N/A')} vs EMA50: {ctx_4h.get('ema50', 'N/A')}
-ATR: 3期={ctx_4h.get('atr3', 'N/A')}, 14期={ctx_4h.get('atr14', 'N/A')}
-成交量: 当前={ctx_4h.get('current_volume', 'N/A')}, 平均={ctx_4h.get('average_volume', 'N/A')}
+═══════════════════════════════════════════════════════════
+[TREND-UP] 4小时级别宏观趋势（用于判断大趋势方向）
+ORDERING: OLDEST → NEWEST
+═══════════════════════════════════════════════════════════
+
+当前EMA状态:
+- EMA20: ${ema20:.2f}
+- EMA50: ${ema50:.2f}
+- 位置关系: {'多头排列🟢' if ema20 > ema50 else '空头排列🔴'}
+
+波动性指标:
+- ATR(3):  {ctx_4h.get('atr3', 'N/A')} (短期波动)
+- ATR(14): {ctx_4h.get('atr14', 'N/A')} (中期波动)
+
+成交量分析:
+- 当前: {ctx_4h.get('current_volume', 'N/A')}
+- 平均: {ctx_4h.get('average_volume', 'N/A')}
+- 状态: {'放量🔊' if ctx_4h.get('current_volume', 0) > ctx_4h.get('average_volume', 1) else '缩量🔇'}
 """
 
+            # 添加序列数据
+            macd_series = ctx_4h.get('macd_series', [])[-10:]
+            rsi14_series = ctx_4h.get('rsi14_series', [])[-10:]
+
+            if macd_series:
+                prompt += f"\n时间序列（最近10个4H K线）:\n"
+                prompt += f"MACD:   {' → '.join([f'{v:.2f}' for v in macd_series])}\n"
+
+            if rsi14_series:
+                prompt += f"RSI14:  {' → '.join([f'{v:.1f}' for v in rsi14_series])}\n"
+
+        # 合约市场数据
         if 'futures_market' in market_data and market_data['futures_market']:
             futures = market_data['futures_market']
             prompt += f"""
-## ⚡ 合约市场数据
+═══════════════════════════════════════════════════════════
+[FUTURES] ⚡ 合约市场数据
+═══════════════════════════════════════════════════════════
 资金费率: {futures.get('funding_rate', 'N/A')}
 持仓量: 当前={futures.get('open_interest', {}).get('current', 'N/A')}, 平均={futures.get('open_interest', {}).get('average', 'N/A')}
 """
 
+        # 账户状态
         prompt += f"""
-## 账户状态
+═══════════════════════════════════════════════════════════
+[ACCOUNT] 账户状态
+═══════════════════════════════════════════════════════════
 可用资金: ${account_info.get('balance', 'N/A')}
 当前持仓数: {len(account_info.get('positions', []))}
 未实现盈亏: ${account_info.get('unrealized_pnl', 'N/A')}
 """
 
-        # 胜率显示策略：只有在交易次数足够时才显示（避免误导AI）
-        MIN_TRADES_FOR_WINRATE = 20  # 可在config.py中配置
+        # [NEW] 清算价监控（如果有持仓）
+        positions = account_info.get('positions', [])
+        if positions and len(positions) > 0:
+            prompt += "\n═══════════════════════════════════════════════════════════\n"
+            prompt += "[DANGER] 清算价格监控 - 务必注意风险！\n"
+            prompt += "═══════════════════════════════════════════════════════════\n"
+
+            for pos in positions:
+                pos_symbol = pos.get('symbol', 'N/A')
+                entry_price = float(pos.get('entryPrice', 0))
+                leverage = int(pos.get('leverage', 1))
+                position_amt = float(pos.get('positionAmt', 0))
+                side = 'LONG' if position_amt > 0 else 'SHORT'
+
+                # 获取当前价格
+                if pos_symbol == market_data.get('symbol'):
+                    current_price = float(market_data.get('current_price', entry_price))
+                else:
+                    current_price = entry_price  # 如果不是当前分析的symbol，使用入场价
+
+                # 计算清算价
+                try:
+                    # 导入计算方法
+                    maintenance_margin_rate = 0.05
+                    if side == 'LONG':
+                        liquidation_price = entry_price * (1 - (1 - maintenance_margin_rate) / leverage)
+                    else:
+                        liquidation_price = entry_price * (1 + (1 - maintenance_margin_rate) / leverage)
+
+                    # 计算距离清算价的百分比
+                    if side == 'LONG':
+                        distance_pct = ((current_price - liquidation_price) / liquidation_price) * 100
+                    else:
+                        distance_pct = ((liquidation_price - current_price) / current_price) * 100
+
+                    risk_level = '🔴极危险' if distance_pct < 5 else '🟠高风险' if distance_pct < 10 else '🟡警告' if distance_pct < 20 else '🟢安全'
+
+                    prompt += f"""
+持仓: {pos_symbol}
+方向: {side} {leverage}x
+入场价: ${entry_price:.2f}
+当前价: ${current_price:.2f}
+清算价: ${liquidation_price:.2f}
+距离清算价: {distance_pct:.2f}% {risk_level}
+未实现盈亏: ${float(pos.get('unRealizedProfit', 0)):.2f}
+"""
+                except Exception as e:
+                    prompt += f"\n持仓: {pos_symbol} (清算价计算失败: {str(e)})\n"
+
+        # 近期表现
+        MIN_TRADES_FOR_WINRATE = 20
         if trade_history and len(trade_history) >= MIN_TRADES_FOR_WINRATE:
-            recent_trades = trade_history[-10:]  # 看最近10笔，更有统计意义
+            recent_trades = trade_history[-10:]
             wins = sum(1 for t in recent_trades if t.get('pnl', 0) > 0)
             winrate_pct = (wins / len(recent_trades)) * 100
-            prompt += f"\n## 近期表现\n最近{len(recent_trades)}笔胜率: {winrate_pct:.1f}% ({wins}胜/{len(recent_trades)-wins}负)\n"
+            prompt += f"""
+═══════════════════════════════════════════════════════════
+[PERFORMANCE] 近期表现
+═══════════════════════════════════════════════════════════
+最近{len(recent_trades)}笔胜率: {winrate_pct:.1f}% ({wins}胜/{len(recent_trades)-wins}负)
+"""
         elif trade_history and len(trade_history) > 0:
-            # 交易次数太少，不显示胜率，只显示交易数
-            prompt += f"\n## 交易状态\n已完成交易: {len(trade_history)}笔 (数据积累中，暂不显示胜率)\n"
+            prompt += f"""
+═══════════════════════════════════════════════════════════
+[PERFORMANCE] 交易状态
+═══════════════════════════════════════════════════════════
+已完成交易: {len(trade_history)}笔 (数据积累中，暂不显示胜率)
+"""
 
         prompt += "\n请分析并给出决策（JSON格式）。"
 
@@ -1150,7 +1312,7 @@ ATR: 3期={ctx_4h.get('atr3', 'N/A')}, 14期={ctx_4h.get('atr14', 'N/A')}
 
         # 限制范围（给DeepSeek更大的自主权）
         decision['position_size'] = max(1, min(100, decision['position_size']))
-        decision['leverage'] = max(1, min(20, decision['leverage']))  # 最高20倍杠杆
+        decision['leverage'] = max(1, min(30, decision['leverage']))  # 最高30倍杠杆
         decision['stop_loss_pct'] = max(0.5, min(10, decision.get('stop_loss_pct', 2)))
         decision['take_profit_pct'] = max(1, min(20, decision.get('take_profit_pct', 4)))
         decision['confidence'] = max(0, min(100, decision['confidence']))
@@ -1235,7 +1397,7 @@ ATR: 3期={ctx_4h.get('atr3', 'N/A')}, 14期={ctx_4h.get('atr14', 'N/A')}
     "position_size": 20-50,
     "stop_loss_pct": 1.5-2.5,
     "take_profit_pct": 5-15,
-    "leverage": 8-20
+    "leverage": 8-30
 }
 
 [WARNING] 这是**开仓决策**，只返回 OPEN_LONG/OPEN_SHORT/HOLD。

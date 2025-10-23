@@ -642,3 +642,35 @@ class MarketAnalyzer:
             'trend': 'uptrend' if current_price > float(sma_50.iloc[-1]) else 'downtrend',
             'atr': context_4h.get('atr14', 0) if context_4h else 0
         }
+
+    @staticmethod
+    def calculate_liquidation_price(entry_price: float, leverage: int, side: str) -> float:
+        """
+        计算清算价格
+
+        Args:
+            entry_price: 入场价格
+            leverage: 杠杆倍数
+            side: 持仓方向 ('LONG' 或 'SHORT')
+
+        Returns:
+            清算价格
+
+        Formula:
+            币安期货维持保证金率约为5%（不同杠杆档位略有差异）
+            清算价 = 入场价 × (1 - (1 - 维持保证金率) / 杠杆)  # LONG
+            清算价 = 入场价 × (1 + (1 - 维持保证金率) / 杠杆)  # SHORT
+        """
+        # 币安期货维持保证金率（简化处理，实际根据杠杆档位有所不同）
+        maintenance_margin_rate = 0.05
+
+        if side.upper() in ['LONG', 'BUY']:
+            # 多头清算价：入场价 × (1 - (1 - MMR) / leverage)
+            liquidation_price = entry_price * (1 - (1 - maintenance_margin_rate) / leverage)
+        elif side.upper() in ['SHORT', 'SELL']:
+            # 空头清算价：入场价 × (1 + (1 - MMR) / leverage)
+            liquidation_price = entry_price * (1 + (1 - maintenance_margin_rate) / leverage)
+        else:
+            raise ValueError(f"Invalid side: {side}. Must be 'LONG' or 'SHORT'")
+
+        return round(liquidation_price, 2)

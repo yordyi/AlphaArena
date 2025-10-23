@@ -88,13 +88,14 @@ class AITradingEngine:
             self.runtime_manager = None
             self.enhanced_engine = None
 
-    def analyze_and_trade(self, symbol: str, max_position_pct: float = 10.0) -> Dict:
+    def analyze_and_trade(self, symbol: str, max_position_pct: float = 10.0, runtime_stats: Dict = None) -> Dict:
         """
         分析市场并执行交易
 
         Args:
             symbol: 交易对（如 BTCUSDT）
             max_position_pct: 最大仓位百分比
+            runtime_stats: 可选的系统运行统计信息（由bot实例提供）
 
         Returns:
             交易结果
@@ -138,8 +139,8 @@ class AITradingEngine:
             else:
                 market_data = self._gather_market_data(symbol)
 
-            # 2. 获取账户信息
-            account_info = self._get_account_info()
+            # 2. 获取账户信息（传递runtime_stats）
+            account_info = self._get_account_info(runtime_stats=runtime_stats)
 
             # 3. 双模型决策系统：推理模型 + 日常模型
             # 判断是否使用推理模型（Reasoner）
@@ -208,13 +209,14 @@ class AITradingEngine:
                 'error': str(e)
             }
 
-    def analyze_position_for_closing(self, symbol: str, position: Dict) -> Dict:
+    def analyze_position_for_closing(self, symbol: str, position: Dict, runtime_stats: Dict = None) -> Dict:
         """
         评估现有持仓是否应该平仓
 
         Args:
             symbol: 交易对
             position: 当前持仓信息
+            runtime_stats: 可选的系统运行统计信息（由bot实例提供）
 
         Returns:
             评估结果，包含AI决策
@@ -227,8 +229,8 @@ class AITradingEngine:
             # 获取市场数据
             market_data = self._gather_market_data(symbol)
 
-            # 获取账户信息
-            account_info = self._get_account_info()
+            # 获取账户信息（传递runtime_stats）
+            account_info = self._get_account_info(runtime_stats=runtime_stats)
 
             # 构建持仓信息
             entry_price = float(position.get('entryPrice', 0))
@@ -361,8 +363,13 @@ class AITradingEngine:
             self.logger.error(f"详细错误: {traceback.format_exc()}")
             raise
 
-    def _get_account_info(self) -> Dict:
-        """获取账户信息"""
+    def _get_account_info(self, runtime_stats: Dict = None) -> Dict:
+        """
+        获取账户信息
+
+        Args:
+            runtime_stats: 可选的系统运行统计信息（由bot实例提供）
+        """
         try:
             # 获取合约余额
             futures_balance = self.binance.get_futures_usdt_balance()
@@ -373,12 +380,18 @@ class AITradingEngine:
             # 计算未实现盈亏
             total_unrealized_pnl = sum(float(pos.get('unRealizedProfit', 0)) for pos in positions)
 
-            return {
+            account_info = {
                 'balance': futures_balance,
                 'total_value': futures_balance + total_unrealized_pnl,
                 'positions': positions,
                 'unrealized_pnl': total_unrealized_pnl
             }
+
+            # [NEW] 如果提供了runtime_stats，添加到account_info
+            if runtime_stats:
+                account_info['runtime_stats'] = runtime_stats
+
+            return account_info
 
         except Exception as e:
             self.logger.error(f"获取账户信息失败: {e}")
