@@ -25,7 +25,7 @@ class HealthMonitor:
     def __init__(self):
         self.bot_process_name = "alpha_arena_bot.py"
         self.dashboard_process_name = "web_dashboard.py"
-        self.dashboard_url = "http://localhost:5000"
+        self.dashboard_url = "http://localhost:5001"  # [V3.3] 修复端口配置
         self.performance_file = "performance_data.json"
         self.roll_state_file = "roll_state.json"
 
