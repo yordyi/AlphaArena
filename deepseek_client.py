@@ -22,7 +22,8 @@ class DeepSeekClient:
             api_key: DeepSeek API 密钥
         """
         self.api_key = api_key
-        self.base_url = "https://api.deepseek.com/v1"
+        self.base_url = "https://zenmux.ai/api/v1"  # ZenMux API 端点
+        self.model_name = "deepseek/deepseek-chat"  # ZenMux 模型名称
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
@@ -102,7 +103,7 @@ class DeepSeekClient:
                 'aggressive_mode': False
             }
 
-    def chat_completion(self, messages: List[Dict], model: str = "deepseek-chat",
+    def chat_completion(self, messages: List[Dict], model: str = "deepseek/deepseek-chat",
                        temperature: float = 0.7, max_tokens: int = 2000,
                        timeout: int = None, max_retries: int = 2) -> Dict:
         """
@@ -186,10 +187,10 @@ class DeepSeekClient:
             API 响应
         """
         try:
-            self.logger.info("[AI-THINK] 调用DeepSeek Chat V3.1推理模型...")
+            self.logger.info("[AI-THINK] 调用DeepSeek Chat V3.1推理模型 (via ZenMux)...")
             return self.chat_completion(
                 messages=messages,
-                model="deepseek-chat",  # Chat V3.1
+                model="deepseek/deepseek-chat",  # ZenMux 模型名称
                 temperature=0.1,  # 使用较低温度提高准确性
                 max_tokens=max_tokens
             )
@@ -1909,7 +1910,7 @@ ORDERING: OLDEST → NEWEST
                 "decision": decision,
                 "raw_response": ai_response,
                 "reasoning_content": reasoning_content,
-                "model_used": "deepseek-chat-v3.1"
+                "model_used": "deepseek/deepseek-chat (via ZenMux)"
             }
 
         except Exception as e:

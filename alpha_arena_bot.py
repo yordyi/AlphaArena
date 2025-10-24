@@ -21,6 +21,7 @@ from performance_tracker import PerformanceTracker
 from pro_log_formatter import ProTradingFormatter
 from roll_tracker import RollTracker  # [NEW V2.0] ROLL状态追踪器
 from advanced_position_manager import AdvancedPositionManager  # [NEW V2.0] 高级仓位管理
+from rolling_position_manager import RollingPositionManager  # [NEW V3.0] 浮盈滚仓管理器
 
 
 class AlphaArenaBot:
@@ -150,6 +151,15 @@ class AlphaArenaBot:
 
         # [NEW V2.0] ROLL状态追踪器 (需先创建，再传给AI引擎)
         self.roll_tracker = RollTracker(data_file='roll_state.json')
+
+        # [NEW V3.5] 浮盈滚仓管理器 - 2分钟超短线策略
+        self.rolling_manager = RollingPositionManager(
+            profit_threshold_pct=1.5,  # 盈利>1.5%触发滚仓 (降低门槛)
+            roll_ratio=0.5,  # 每次加仓50%
+            max_rolls=2,  # 最多滚2次
+            min_roll_interval_minutes=3  # 最少间隔3分钟 (超短线)
+        )
+        self.logger.info("[OK] 浮盈滚仓管理器已启动 (盈利>1.5%触发, 最多滚2次)")
 
         # AI 交易引擎
         self.ai_engine = AITradingEngine(
@@ -359,6 +369,9 @@ class AlphaArenaBot:
                     break
 
             if existing_position:
+                # [NEW V3.0] 首先检查是否应该滚仓 (浮盈加仓)
+                self._check_and_execute_rolling(symbol, existing_position)
+
                 # [OK] 新功能: 让AI评估是否应该平仓
                 self.logger.info(f"  [SEARCH] {symbol} 已有持仓，让AI评估是否平仓...")
 
@@ -810,6 +823,90 @@ class AlphaArenaBot:
             self.logger.error(f"关闭过程出错: {e}")
 
 
+    def _check_and_execute_rolling(self, symbol: str, position: Dict):
+        """
+        [NEW V3.5] 检查并执行浮盈滚仓
+
+        Args:
+            symbol: 交易对
+            position: 现有持仓信息
+        """
+        try:
+            self.logger.info(f"  [ROLL-CHECK] 检查 {symbol} 滚仓条件...")
+
+            # 计算当前盈亏百分比
+            pos_amt = float(position.get('positionAmt', 0))
+            entry_price = float(position.get('entryPrice', 0))
+            mark_price = float(position.get('markPrice', 0))
+            unrealized_pnl = float(position.get('unRealizedProfit', 0))
+
+            if entry_price == 0:
+                self.logger.warning(f"  [ROLL-CHECK] {symbol} 开仓价为0,跳过滚仓检查")
+                return
+
+            # 计算盈亏百分比
+            if pos_amt > 0:  # 多头
+                pnl_pct = ((mark_price - entry_price) / entry_price) * 100
+            else:  # 空头
+                pnl_pct = ((entry_price - mark_price) / entry_price) * 100
+
+            self.logger.info(f"  [ROLL-CHECK] {symbol} 当前盈亏: {pnl_pct:.2f}%, 阈值: {self.rolling_manager.profit_threshold_pct}%")
+
+            # 构建持仓信息
+            pos_info = {
+                'symbol': symbol,
+                'pnl_pct': pnl_pct,
+                'quantity': pos_amt,
+                'entry_price': entry_price,
+                'side': 'LONG' if pos_amt > 0 else 'SHORT'
+            }
+
+            # 检查是否应该滚仓
+            should_roll, reason, roll_quantity = self.rolling_manager.should_roll_position(pos_info)
+
+            if should_roll:
+                self.logger.info(f"\n🎯 [ROLL] {symbol} 触发滚仓条件!")
+                self.logger.info(f"   {reason}")
+
+                # 执行加仓
+                try:
+                    side = 'BUY' if pos_amt > 0 else 'SELL'
+                    leverage = int(position.get('leverage', 30))
+
+                    self.logger.info(f"   执行加仓: {side} {abs(roll_quantity):.4f} {symbol} ({leverage}x)")
+
+                    # 确保杠杆设置正确
+                    self.binance.set_leverage(symbol, leverage)
+
+                    # 创建市价单加仓
+                    order_result = self.binance.create_futures_order(
+                        symbol=symbol,
+                        side=side,
+                        order_type='MARKET',
+                        quantity=abs(roll_quantity),
+                        position_side='BOTH'
+                    )
+
+                    if order_result:
+                        # 记录滚仓
+                        self.rolling_manager.record_roll(symbol)
+                        self.logger.info(f"   ✅ 滚仓成功! 新增仓位 {abs(roll_quantity):.4f}")
+
+                        # 更新滚仓记录到 roll_tracker
+                        roll_info = self.rolling_manager.get_roll_info(symbol)
+                        self.logger.info(f"   📊 已滚仓 {roll_info['roll_count']}/{roll_info['max_rolls']} 次")
+                    else:
+                        self.logger.warning(f"   ⚠️ 滚仓下单失败")
+
+                except Exception as e:
+                    self.logger.error(f"   ❌ 滚仓执行失败: {e}")
+            else:
+                self.logger.info(f"  [ROLL-CHECK] {symbol} 不满足滚仓条件: {reason}")
+
+        except Exception as e:
+            self.logger.error(f"[ERROR] 滚仓检查失败: {e}")
+
+
 def main():
     """主函数"""
     # 创建并运行机器人
@@ -845,8 +942,8 @@ def main():
 ║       ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
 ║       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
 ║                                                          ║
-║         AI-Powered Trading System v3.3 🚀               ║
-║             ROLL Strategy Priority Update               ║
+║         AI-Powered Trading System v3.5 🚀               ║
+║        2min Ultra-Fast + 30x Leverage + Roll Position   ║
 ║        Inspired by nof1.ai Alpha Arena Experiment       ║
 ╚══════════════════════════════════════════════════════════╝
 {reset}
