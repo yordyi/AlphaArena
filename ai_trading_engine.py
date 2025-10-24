@@ -31,6 +31,7 @@ class AITradingEngine:
 
     def __init__(self, deepseek_api_key: str, binance_client: BinanceClient,
                  market_analyzer: MarketAnalyzer, risk_manager: RiskManager,
+                 performance_tracker=None,
                  enable_enhanced_features: bool = True):
         """
         初始化 AI 交易引擎
@@ -40,12 +41,14 @@ class AITradingEngine:
             binance_client: Binance 客户端
             market_analyzer: 市场分析器
             risk_manager: 风险管理器
+            performance_tracker: 性能追踪器（用于保存交易到文件）
             enable_enhanced_features: 是否启用增强功能（运行状态追踪、丰富市场数据）
         """
         self.deepseek = DeepSeekClient(deepseek_api_key)
         self.binance = binance_client
         self.market_analyzer = market_analyzer
         self.risk_manager = risk_manager
+        self.performance = performance_tracker  # 性能追踪器
 
         self.logger = logging.getLogger(__name__)
         self.trade_history = []
@@ -769,6 +772,24 @@ class AITradingEngine:
         # 只保留最近 100 笔交易
         if len(self.trade_history) > 100:
             self.trade_history = self.trade_history[-100:]
+
+        # [FIX] 同时保存到performance_data.json（如果performance tracker可用）
+        if self.performance:
+            try:
+                self.performance.record_trade({
+                    'symbol': symbol,
+                    'action': decision['action'],
+                    'entry_price': trade_result.get('entry_price') or trade_result.get('price'),
+                    'quantity': trade_result.get('quantity'),
+                    'leverage': decision.get('leverage', 1),
+                    'stop_loss': decision.get('stop_loss'),
+                    'take_profit': decision.get('take_profit'),
+                    'confidence': decision['confidence'],
+                    'reasoning': decision['reasoning']
+                })
+                self.logger.debug(f"[RECORD] 交易已保存到performance_data.json: {symbol} {decision['action']}")
+            except Exception as e:
+                self.logger.error(f"[ERROR] 保存交易到performance_data.json失败: {e}")
 
     def _determine_trend(self, current_price: float, sma_20: float, sma_50: float) -> str:
         """判断趋势"""

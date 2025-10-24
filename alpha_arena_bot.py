@@ -142,18 +142,19 @@ class AlphaArenaBot:
         }
         self.risk_manager = RiskManager(risk_config)
 
+        # 性能追踪器（使用实际余额） - 必须在AI引擎之前初始化
+        self.performance = PerformanceTracker(
+            initial_capital=self.initial_capital,
+            data_file='performance_data.json'
+        )
+
         # AI 交易引擎
         self.ai_engine = AITradingEngine(
             deepseek_api_key=self.deepseek_api_key,
             binance_client=self.binance,
             market_analyzer=self.market_analyzer,
-            risk_manager=self.risk_manager
-        )
-
-        # 性能追踪器（使用实际余额）
-        self.performance = PerformanceTracker(
-            initial_capital=self.initial_capital,
-            data_file='performance_data.json'
+            risk_manager=self.risk_manager,
+            performance_tracker=self.performance  # [FIX] 传入性能追踪器
         )
 
         # [NEW V2.0] ROLL状态追踪器
