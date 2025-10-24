@@ -584,7 +584,15 @@ class BinanceClient:
         return {'msg': 'No position to close'}
 
     def close_all_positions(self, symbol: str = None) -> List[Dict]:
-        """平所有仓位"""
+        """
+        平所有仓位并取消所有挂单
+
+        Args:
+            symbol: 指定交易对（可选），不指定则平所有仓位
+
+        Returns:
+            操作结果列表
+        """
         positions = self.get_active_positions()
         results = []
 
@@ -593,11 +601,20 @@ class BinanceClient:
                 continue
 
             try:
-                result = self.close_position(
+                # 先取消该交易对的所有挂单（止损止盈等）
+                cancel_result = self.cancel_stop_orders(pos['symbol'])
+
+                # 再平仓
+                close_result = self.close_position(
                     pos['symbol'],
                     pos.get('positionSide', 'BOTH')
                 )
-                results.append(result)
+
+                results.append({
+                    'symbol': pos['symbol'],
+                    'close': close_result,
+                    'cancel': cancel_result
+                })
             except Exception as e:
                 results.append({'symbol': pos['symbol'], 'error': str(e)})
 
@@ -605,27 +622,45 @@ class BinanceClient:
 
     def close_long(self, symbol: str) -> Dict:
         """
-        平多单（专用函数）
+        平多单并取消所有挂单
 
         Args:
             symbol: 交易对
 
         Returns:
-            平仓结果
+            平仓结果（包含取消挂单信息）
         """
-        return self.close_position(symbol, position_side='LONG')
+        # 先取消挂单
+        cancel_result = self.cancel_stop_orders(symbol)
+
+        # 再平仓
+        close_result = self.close_position(symbol, position_side='LONG')
+
+        return {
+            'close': close_result,
+            'cancel': cancel_result
+        }
 
     def close_short(self, symbol: str) -> Dict:
         """
-        平空单（专用函数）
+        平空单并取消所有挂单
 
         Args:
             symbol: 交易对
 
         Returns:
-            平仓结果
+            平仓结果（包含取消挂单信息）
         """
-        return self.close_position(symbol, position_side='SHORT')
+        # 先取消挂单
+        cancel_result = self.cancel_stop_orders(symbol)
+
+        # 再平仓
+        close_result = self.close_position(symbol, position_side='SHORT')
+
+        return {
+            'close': close_result,
+            'cancel': cancel_result
+        }
 
     def close_position_partial(self, symbol: str, percentage: float,
                                position_side: str = 'BOTH') -> Dict:
