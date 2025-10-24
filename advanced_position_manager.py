@@ -38,10 +38,10 @@ class AdvancedPositionManager:
 
     # ==================== 1. 滚仓策略 ====================
 
-    def can_roll_position(self, symbol: str, profit_threshold_pct: float = 10.0,
+    def can_roll_position(self, symbol: str, profit_threshold_pct: float = 6.0,
                           max_rolls: int = 3) -> Tuple[bool, str, float]:
         """
-        检查是否可以进行滚仓（使用浮盈加仓）
+        检查是否可以进行滚仓（使用浮盈加仓）[改进版: 更激进的小账户复利策略]
 
         滚仓策略：
         - 当浮盈达到一定百分比时，使用部分浮盈开新仓
@@ -50,7 +50,7 @@ class AdvancedPositionManager:
 
         Args:
             symbol: 交易对
-            profit_threshold_pct: 浮盈达到多少百分比可以滚仓（默认10%）
+            profit_threshold_pct: 浮盈达到多少百分比可以滚仓（默认6%，更激进）
             max_rolls: 最多允许滚几次（默认3次）
 
         Returns:
@@ -94,15 +94,25 @@ class AdvancedPositionManager:
             if position_margin > available_balance * 0.8:  # 仓位保证金超过可用余额80%
                 return False, "仓位保证金已接近上限，不建议继续滚仓", 0.0
 
-            # 计算可用于滚仓的浮盈（使用50%的浮盈）
-            usable_pnl = unrealized_pnl * 0.5  # 保守策略，只用一半浮盈
+            # [NEW] 计算可用于滚仓的浮盈（使用50-70%的浮盈，更激进）
+            # 根据账户规模动态调整：小账户($20-$100)使用60-70%，大账户使用50%
+            available_balance = self.client.get_futures_available_balance()
+            if available_balance < 100:  # 小账户
+                reinvest_ratio = 0.65  # 65%的浮盈，更激进
+            elif available_balance < 500:  # 中等账户
+                reinvest_ratio = 0.60  # 60%的浮盈
+            else:  # 大账户
+                reinvest_ratio = 0.50  # 50%的浮盈，更保守
 
-            if usable_pnl < 10:  # 至少10 USDT才滚仓
+            usable_pnl = unrealized_pnl * reinvest_ratio
+
+            if usable_pnl < 5:  # [NEW] 降低到5 USDT阈值，适配小账户
                 return False, f"可用浮盈{usable_pnl:.2f} USDT太少", 0.0
 
             self.logger.info(
                 f"✅ 可以滚仓 {symbol}: 浮盈{profit_pct:.2f}% "
-                f"(${unrealized_pnl:.2f}), 可用于滚仓: ${usable_pnl:.2f}"
+                f"(${unrealized_pnl:.2f}), 可用于滚仓: ${usable_pnl:.2f} "
+                f"(使用{reinvest_ratio*100:.0f}%浮盈)"
             )
 
             return True, "满足滚仓条件", usable_pnl
