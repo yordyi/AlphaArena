@@ -313,80 +313,50 @@ def get_positions():
 
 @app.route('/api/decisions')
 def get_ai_decisions():
-    """获取AI决策 API - 从日志文件实时提取"""
+    """获取AI决策 API - 从ai_decisions.json读取结构化数据 (V3.5修复)"""
     try:
-        import re
-        from datetime import datetime
+        decisions_file = 'ai_decisions.json'
 
-        decisions = []
-        log_file = f'logs/alpha_arena_{datetime.now().strftime("%Y%m%d")}.log'
-
-        if not os.path.exists(log_file):
+        if not os.path.exists(decisions_file):
             return jsonify({'success': True, 'data': []})
 
-        with open(log_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+        # 直接从结构化JSON读取
+        with open(decisions_file, 'r', encoding='utf-8') as f:
+            all_decisions = json.load(f)
 
-        # 正向读取，逐行解析
-        i = 0
-        while i < len(lines):
-            line = lines[i]
+        # 只返回最近20条,格式化为前端需要的结构
+        recent = all_decisions[-20:] if len(all_decisions) > 20 else all_decisions
 
-            # 匹配AI决策行：[SYMBOL] AI决策 (model): ACTION (信心度: XX%)
-            if 'AI决策' in line and '[' in line and ']' in line:
-                decision = {}
+        formatted = []
+        for d in recent:
+            decision_data = d.get('decision', {})
 
-                # 提取symbol
-                symbol_match = re.search(r'\[([A-Z]+USDT)\]', line)
-                if symbol_match:
-                    decision['symbol'] = symbol_match.group(1)
+            # 提取核心字段
+            formatted_decision = {
+                'time': d.get('timestamp', ''),
+                'symbol': decision_data.get('symbol', 'N/A'),
+                'action': decision_data.get('action', 'HOLD'),
+                'confidence': decision_data.get('confidence', 0),
+                'reasoning': decision_data.get('reasoning', '')[:300],  # 截断过长的理由
+                'model_used': 'deepseek-chat',
+                'leverage': decision_data.get('leverage', 1),
+                'position_size': decision_data.get('position_size', 0),
+                'executed': decision_data.get('executed', False)
+            }
 
-                # 提取模型类型
-                model_match = re.search(r'AI决策 \(([^)]+)\)', line)
-                if model_match:
-                    decision['model_used'] = model_match.group(1)
-
-                # 提取动作：冒号后、括号前
-                action_match = re.search(r'AI决策 \([^)]+\):\s*([A-Z]+)', line)
-                if action_match:
-                    decision['action'] = action_match.group(1)
-
-                # 提取信心度
-                conf_match = re.search(r'信心度:\s*(\d+)%', line)
-                if conf_match:
-                    decision['confidence'] = conf_match.group(1)
-
-                # 提取时间戳
-                time_match = re.match(r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),(\d+)', line)
-                if time_match:
-                    decision['time'] = f"{time_match.group(1)},{time_match.group(2)}"
-
-                # 读取下一行的理由
-                if i + 1 < len(lines) and '理由:' in lines[i + 1]:
-                    reason_match = re.search(r'理由:\s*(.+)$', lines[i + 1])
-                    if reason_match:
-                        decision['reasoning'] = reason_match.group(1).strip()
-
-                # 读取推理过程（如果有）
-                if i + 2 < len(lines) and '[AI-THINK] 推理过程:' in lines[i + 2]:
-                    reasoning_match = re.search(r'[AI-THINK] 推理过程:\s*(.+)$', lines[i + 2])
-                    if reasoning_match:
-                        decision['reasoning_content'] = reasoning_match.group(1).strip()
-
-                # 检查是否有完整数据
-                if all(k in decision for k in ['symbol', 'action', 'confidence', 'reasoning']):
-                    decisions.append(decision)
-
-            i += 1
-
-        # 只返回最近20条
-        decisions = decisions[-20:]
+            formatted.append(formatted_decision)
 
         return jsonify({
             'success': True,
-            'data': decisions
+            'data': formatted
         })
 
+    except json.JSONDecodeError as e:
+        return jsonify({
+            'success': False,
+            'error': f'JSON解析错误: {str(e)}',
+            'data': []
+        })
     except Exception as e:
         return jsonify({
             'success': False,
