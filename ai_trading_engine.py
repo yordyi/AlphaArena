@@ -31,7 +31,7 @@ class AITradingEngine:
 
     def __init__(self, deepseek_api_key: str, binance_client: BinanceClient,
                  market_analyzer: MarketAnalyzer, risk_manager: RiskManager,
-                 performance_tracker=None,
+                 performance_tracker=None, roll_tracker=None,
                  enable_enhanced_features: bool = True):
         """
         初始化 AI 交易引擎
@@ -42,6 +42,7 @@ class AITradingEngine:
             market_analyzer: 市场分析器
             risk_manager: 风险管理器
             performance_tracker: 性能追踪器（用于保存交易到文件）
+            roll_tracker: ROLL状态追踪器
             enable_enhanced_features: 是否启用增强功能（运行状态追踪、丰富市场数据）
         """
         self.deepseek = DeepSeekClient(deepseek_api_key)
@@ -49,6 +50,7 @@ class AITradingEngine:
         self.market_analyzer = market_analyzer
         self.risk_manager = risk_manager
         self.performance = performance_tracker  # 性能追踪器
+        self.roll_tracker = roll_tracker  # ROLL追踪器
 
         self.logger = logging.getLogger(__name__)
         self.trade_history = []
@@ -286,7 +288,8 @@ class AITradingEngine:
             decision = self.deepseek.evaluate_position_for_closing(
                 position_info,
                 market_data,
-                account_info
+                account_info,
+                roll_tracker=self.roll_tracker  # [V3.3] 传入ROLL追踪器
             )
 
             self.logger.info(f"[{symbol}] AI决策: {decision.get('action', 'HOLD')}")

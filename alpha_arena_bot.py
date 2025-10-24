@@ -148,17 +148,18 @@ class AlphaArenaBot:
             data_file='performance_data.json'
         )
 
+        # [NEW V2.0] ROLL状态追踪器 (需先创建，再传给AI引擎)
+        self.roll_tracker = RollTracker(data_file='roll_state.json')
+
         # AI 交易引擎
         self.ai_engine = AITradingEngine(
             deepseek_api_key=self.deepseek_api_key,
             binance_client=self.binance,
             market_analyzer=self.market_analyzer,
             risk_manager=self.risk_manager,
-            performance_tracker=self.performance  # [FIX] 传入性能追踪器
+            performance_tracker=self.performance,  # [FIX] 传入性能追踪器
+            roll_tracker=self.roll_tracker  # [V3.3] 传入ROLL追踪器
         )
-
-        # [NEW V2.0] ROLL状态追踪器
-        self.roll_tracker = RollTracker(data_file='roll_state.json')
 
         # [NEW V2.0] 高级仓位管理器
         self.position_manager = AdvancedPositionManager(
