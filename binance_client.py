@@ -7,8 +7,11 @@ import hmac
 import hashlib
 import time
 import requests
+import logging
 from typing import Dict, List, Optional, Any
 from urllib.parse import urlencode
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 class BinanceClient:
@@ -29,10 +32,47 @@ class BinanceClient:
         self.api_key = api_key
         self.api_secret = api_secret
         self.testnet = testnet
+        self.logger = logging.getLogger(__name__)
 
         if testnet:
             self.BASE_URL = "https://testnet.binance.vision"
             self.FUTURES_URL = "https://testnet.binancefuture.com"
+
+        # 创建带重试机制的session
+        self.session = self._create_session()
+
+    def _create_session(self) -> requests.Session:
+        """
+        创建带重试机制的requests session
+
+        自动重试策略:
+        - SSL错误: 重试3次
+        - 连接错误: 重试3次
+        - 指数退避: 0.5s, 1s, 2s
+        """
+        session = requests.Session()
+
+        # 配置重试策略
+        retry_strategy = Retry(
+            total=3,  # 总共重试3次
+            backoff_factor=0.5,  # 指数退避因子: 0.5s, 1s, 2s
+            status_forcelist=[429, 500, 502, 503, 504],  # 这些状态码触发重试
+            allowed_methods=["GET", "POST", "DELETE"],  # 允许重试的HTTP方法
+            raise_on_status=False  # 不自动抛出HTTPError
+        )
+
+        # 创建HTTP适配器
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,  # 连接池大小
+            pool_maxsize=10  # 最大连接数
+        )
+
+        # 挂载到session
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+
+        return session
 
     def _generate_signature(self, params: Dict[str, Any]) -> str:
         """生成HMAC SHA256签名"""
@@ -47,7 +87,7 @@ class BinanceClient:
     def _request(self, method: str, endpoint: str, params: Dict = None,
                  signed: bool = False, futures: bool = False) -> Dict:
         """
-        向Binance API发送HTTP请求
+        向Binance API发送HTTP请求（增强版：自动重试+详细日志）
 
         Args:
             method: HTTP方法 (GET, POST, DELETE)
@@ -73,26 +113,73 @@ class BinanceClient:
             params['timestamp'] = int(time.time() * 1000)
             params['signature'] = self._generate_signature(params)
 
-        try:
-            if method == 'GET':
-                response = requests.get(url, params=params, headers=headers, timeout=30)
-            elif method == 'POST':
-                response = requests.post(url, params=params, headers=headers, timeout=30)
-            elif method == 'DELETE':
-                response = requests.delete(url, params=params, headers=headers, timeout=30)
-            else:
-                raise ValueError(f"不支持的HTTP方法: {method}")
+        # 尝试发送请求（自动重试机制由session处理）
+        max_attempts = 3
+        last_error = None
 
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            error_msg = f"API请求失败: {str(e)}"
+        for attempt in range(1, max_attempts + 1):
             try:
-                error_detail = response.json()
-                error_msg += f" | 详细信息: {error_detail}"
-            except:
-                pass
-            raise Exception(error_msg)
+                # 使用带重试机制的session
+                if method == 'GET':
+                    response = self.session.get(url, params=params, headers=headers, timeout=30)
+                elif method == 'POST':
+                    response = self.session.post(url, params=params, headers=headers, timeout=30)
+                elif method == 'DELETE':
+                    response = self.session.delete(url, params=params, headers=headers, timeout=30)
+                else:
+                    raise ValueError(f"不支持的HTTP方法: {method}")
+
+                response.raise_for_status()
+                return response.json()
+
+            except requests.exceptions.SSLError as e:
+                last_error = e
+                error_type = type(e).__name__
+                self.logger.warning(
+                    f"[RETRY {attempt}/{max_attempts}] SSL错误: {error_type} - {str(e)[:100]}"
+                )
+                if attempt < max_attempts:
+                    time.sleep(1 * attempt)  # 指数退避
+                continue
+
+            except requests.exceptions.ConnectionError as e:
+                last_error = e
+                self.logger.warning(
+                    f"[RETRY {attempt}/{max_attempts}] 连接错误: {str(e)[:100]}"
+                )
+                if attempt < max_attempts:
+                    time.sleep(1 * attempt)
+                continue
+
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                self.logger.warning(
+                    f"[RETRY {attempt}/{max_attempts}] 超时错误: {str(e)[:100]}"
+                )
+                if attempt < max_attempts:
+                    time.sleep(1 * attempt)
+                continue
+
+            except requests.exceptions.HTTPError as e:
+                # HTTP错误不重试（4xx, 5xx已经由session处理）
+                error_msg = f"API请求失败: {str(e)}"
+                try:
+                    error_detail = response.json()
+                    error_msg += f" | 详细信息: {error_detail}"
+                except:
+                    pass
+                raise Exception(error_msg)
+
+            except Exception as e:
+                # 其他未知错误
+                last_error = e
+                self.logger.error(f"未知错误: {type(e).__name__} - {str(e)}")
+                raise Exception(f"API请求失败: {str(e)}")
+
+        # 所有重试都失败
+        error_msg = f"API请求失败（{max_attempts}次重试后）: {type(last_error).__name__} - {str(last_error)}"
+        self.logger.error(error_msg)
+        raise Exception(error_msg)
 
     # ========== 账户信息接口 ==========
 
