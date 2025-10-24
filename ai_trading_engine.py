@@ -125,14 +125,22 @@ class AITradingEngine:
                     }
 
             # 1. 检查最近胜率（仅在有足够交易历史时显示）
+            # [V3.4 FIX] 只有在有真实交易记录（pnl不全为0）时才显示胜率警告
             if len(self.trade_history) >= 5:
-                recent_win_rate = self._calculate_recent_win_rate(n=5)
-                if recent_win_rate < 0.4:
-                    self.logger.warning(f"[{symbol}] [WARNING] 近5笔胜率较低: {recent_win_rate*100:.1f}% - AI将根据这个信息自主决策")
-                elif recent_win_rate > 0.6:
-                    self.logger.info(f"[{symbol}] [INFO] 近5笔胜率良好: {recent_win_rate*100:.1f}%")
+                # 检查是否有真实交易（至少有一笔非零pnl）
+                has_real_trades = any(t.get('pnl', 0) != 0 for t in self.trade_history[-5:])
+
+                if has_real_trades:
+                    recent_win_rate = self._calculate_recent_win_rate(n=5)
+                    if recent_win_rate < 0.4:
+                        self.logger.warning(f"[{symbol}] [WARNING] 近5笔胜率较低: {recent_win_rate*100:.1f}% - AI将根据这个信息自主决策")
+                    elif recent_win_rate > 0.6:
+                        self.logger.info(f"[{symbol}] [INFO] 近5笔胜率良好: {recent_win_rate*100:.1f}%")
+                    else:
+                        self.logger.info(f"[{symbol}] [INFO] 近5笔胜率: {recent_win_rate*100:.1f}%")
                 else:
-                    self.logger.info(f"[{symbol}] [INFO] 近5笔胜率: {recent_win_rate*100:.1f}%")
+                    # 全新系统，无真实交易历史，不显示警告
+                    self.logger.debug(f"[{symbol}] [DEBUG] 无有效交易历史，跳过胜率检查")
 
             # 2. 收集市场数据
             self.logger.info(f"[{symbol}] 开始分析...")

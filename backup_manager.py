@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Alpha Arena 数据备份管理器 (V3.3)
+Alpha Arena 数据备份管理器 (V3.4)
 提供自动备份、恢复和归档功能
 """
 
