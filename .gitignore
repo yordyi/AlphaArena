@@ -70,3 +70,4 @@ alpha-arena-nextjs/node_modules/
 credentials.json
 api_keys.txt
 secrets/
+*.pid

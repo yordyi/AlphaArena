@@ -19,6 +19,8 @@ from risk_manager import RiskManager
 from ai_trading_engine import AITradingEngine
 from performance_tracker import PerformanceTracker
 from pro_log_formatter import ProTradingFormatter
+from roll_tracker import RollTracker  # [NEW V2.0] ROLL状态追踪器
+from advanced_position_manager import AdvancedPositionManager  # [NEW V2.0] 高级仓位管理
 
 
 class AlphaArenaBot:
@@ -152,6 +154,15 @@ class AlphaArenaBot:
         self.performance = PerformanceTracker(
             initial_capital=self.initial_capital,
             data_file='performance_data.json'
+        )
+
+        # [NEW V2.0] ROLL状态追踪器
+        self.roll_tracker = RollTracker(data_file='roll_state.json')
+
+        # [NEW V2.0] 高级仓位管理器
+        self.position_manager = AdvancedPositionManager(
+            binance_client=self.binance,
+            market_analyzer=self.market_analyzer
         )
 
     def _signal_handler(self, signum, frame):
@@ -605,7 +616,7 @@ class AlphaArenaBot:
 
     def execute_roll_strategy(self, symbol: str, position: Dict, decision: Dict) -> Dict:
         """
-        执行浮盈滚仓策略（改进版：不平仓，直接用浮盈加仓）
+        执行浮盈滚仓策略 V2.0（增强版：6次限制+手续费+自动止损）
 
         Args:
             symbol: 交易对
@@ -616,7 +627,16 @@ class AlphaArenaBot:
             执行结果
         """
         try:
-            self.logger.info(f"\n🔄 [ROLL] 开始执行浮盈直接加仓策略: {symbol}")
+            self.logger.info(f"\n🔄 [ROLL V2.0] 开始执行浮盈直接加仓策略: {symbol}")
+
+            # [NEW V2.0] 0. 检查ROLL次数限制（最多6次）
+            can_roll, reason, current_count = self.roll_tracker.can_roll(symbol)
+            if not can_roll:
+                self.logger.error(f"  ❌ [LIMIT] {reason}")
+                self.logger.info(f"  💡 建议: 已达到6次ROLL上限，应该止盈离场了")
+                return {'success': False, 'reason': reason}
+
+            self.logger.info(f"  ✅ [CHECK] ROLL次数检查通过（当前{current_count}次，还剩{6-current_count}次机会）")
 
             # 1. 验证当前浮盈是否达到阈值
             unrealized_pnl = float(position.get('unRealizedProfit', 0))
@@ -624,7 +644,7 @@ class AlphaArenaBot:
             account_value = account_balance + unrealized_pnl
 
             profit_ratio = (unrealized_pnl / account_value) * 100 if account_value > 0 else 0
-            threshold_pct = decision.get('profit_threshold_pct', 6.0)  # [NEW] 默认6%，更激进
+            threshold_pct = decision.get('profit_threshold_pct', 6.0)
 
             self.logger.info(f"  [DATA] 账户总价值: ${account_value:.2f}")
             self.logger.info(f"  [DATA] 未实现盈亏: ${unrealized_pnl:.2f}")
@@ -641,22 +661,27 @@ class AlphaArenaBot:
                 self.logger.warning(f"  [WARNING] 浮盈为负或零，不执行滚仓")
                 return {'success': False, 'reason': '浮盈为负或零'}
 
-            # 2. [NEW] 保持原仓位不动，计算可用浮盈
-            self.logger.info(f"  ✅ [STEP 1] 保持原仓位继续盈利（不平仓）")
-            self.logger.info(f"  [DATA] 原仓位持续盈利中...")
+            # [NEW V2.0] 2. 扣除手续费后计算净浮盈
+            BINANCE_TAKER_FEE = 0.0005  # Binance taker手续费0.05%
+            fee_amount = unrealized_pnl * BINANCE_TAKER_FEE
+            net_unrealized_pnl = unrealized_pnl - fee_amount
+
+            self.logger.info(f"  [STEP 1] 保持原仓位继续盈利（不平仓）")
+            self.logger.info(f"  [FEE] 扣除手续费: ${fee_amount:.2f} (0.05%)")
+            self.logger.info(f"  [NET] 净浮盈: ${net_unrealized_pnl:.2f}")
 
             # 计算可用于加仓的浮盈金额
-            reinvest_pct = decision.get('reinvest_pct', 60.0)  # [NEW] 默认使用60%浮盈
-            reinvest_pct = max(50.0, min(70.0, reinvest_pct))  # [NEW] 限制在50-70%之间，更激进
+            reinvest_pct = decision.get('reinvest_pct', 60.0)
+            reinvest_pct = max(50.0, min(70.0, reinvest_pct))
 
-            reinvest_amount = unrealized_pnl * (reinvest_pct / 100.0)
+            reinvest_amount = net_unrealized_pnl * (reinvest_pct / 100.0)
 
-            self.logger.info(f"  [STEP 2] 使用{reinvest_pct:.1f}%浮盈加仓: ${reinvest_amount:.2f}")
-            self.logger.info(f"  [DATA] 保留浮盈: ${unrealized_pnl - reinvest_amount:.2f}")
+            self.logger.info(f"  [STEP 2] 使用{reinvest_pct:.1f}%净浮盈加仓: ${reinvest_amount:.2f}")
+            self.logger.info(f"  [DATA] 保留浮盈: ${net_unrealized_pnl - reinvest_amount:.2f}")
 
             # 3. 使用AI指定的杠杆开新仓位
             new_leverage = decision.get('leverage', 10)
-            new_leverage = max(1, min(30, new_leverage))  # 限制在1-30x
+            new_leverage = max(1, min(30, new_leverage))
 
             # 获取当前价格
             current_price = self.market_analyzer.get_current_price(symbol)
@@ -664,7 +689,7 @@ class AlphaArenaBot:
             # 计算开仓数量（考虑杠杆）
             position_quantity = (reinvest_amount * new_leverage) / current_price
 
-            # 币安最小开仓量检查（通常BTC最小0.001）
+            # 币安最小开仓量检查
             min_quantity = 0.001
             if position_quantity < min_quantity:
                 self.logger.warning(f"  [WARNING] 开仓数量{position_quantity:.6f}小于最小量{min_quantity}，调整至最小量")
@@ -681,6 +706,16 @@ class AlphaArenaBot:
             # 根据原持仓方向决定新仓位方向（保持同方向）
             position_side = float(position.get('positionAmt', 0))
             side = 'LONG' if position_side > 0 else 'SHORT'
+            entry_price = float(position.get('entryPrice', current_price))
+
+            # [NEW V2.0] 如果是第一次ROLL，初始化tracker
+            if current_count == 0:
+                self.roll_tracker.initialize_position(
+                    symbol=symbol,
+                    entry_price=entry_price,
+                    position_amt=position_side,
+                    side=side
+                )
 
             # 开仓
             if side == 'LONG':
@@ -691,32 +726,60 @@ class AlphaArenaBot:
             if open_result:
                 self.logger.info(f"  [OK] 新仓位加仓成功")
 
+                # [NEW V2.0] 记录ROLL到tracker
+                new_count = self.roll_tracker.increment_roll_count(symbol, {
+                    'current_price': current_price,
+                    'unrealized_pnl': unrealized_pnl,
+                    'profit_pct': profit_ratio,
+                    'reinvest_amount': reinvest_amount,
+                    'new_position_qty': position_quantity,
+                    'leverage': new_leverage
+                })
+
+                # [NEW V2.0] STEP 4: 自动移动止损到盈亏平衡
+                self.logger.info(f"  [STEP 4] 自动移动止损保护利润...")
+                original_entry = self.roll_tracker.get_original_entry_price(symbol)
+                if original_entry:
+                    move_result = self.position_manager.move_stop_to_breakeven(
+                        symbol=symbol,
+                        entry_price=original_entry,
+                        profit_trigger_pct=0.0,  # 立即执行，不检查盈利触发
+                        breakeven_offset_pct=0.2  # 成本价+0.2%（含手续费）
+                    )
+                    if move_result.get('success'):
+                        self.logger.info(f"  ✅ [STOP] 止损已移至盈亏平衡点: ${move_result.get('new_stop_price'):.2f}")
+                    else:
+                        self.logger.warning(f"  ⚠️ [STOP] 止损移动跳过: {move_result.get('error')}")
+
                 # 记录加仓交易
                 self.performance.record_trade({
                     'symbol': symbol,
-                    'action': f'ROLL_ADD_{side}',  # [NEW] 标记为浮盈加仓，不是平仓再开
+                    'action': f'ROLL_ADD_{side}',
                     'entry_price': current_price,
                     'price': current_price,
                     'quantity': position_quantity,
                     'leverage': new_leverage,
                     'confidence': decision.get('confidence', 0),
-                    'reasoning': f"[ROLL] 浮盈{profit_ratio:.1f}%，用${reinvest_amount:.2f}加仓({reinvest_pct:.1f}%浮盈)",
+                    'reasoning': f"[ROLL #{new_count}] 浮盈{profit_ratio:.1f}%，用${reinvest_amount:.2f}加仓（扣费后净额）",
                     'pnl': None
                 })
 
-                self.logger.info(f"  🚀 [SUCCESS] 浮盈滚仓完成！")
-                self.logger.info(f"  ✅ 原仓位: 继续持有，继续盈利")
-                self.logger.info(f"  ✅ 新仓位: 投入${reinvest_amount:.2f} ({reinvest_pct:.1f}%浮盈)")
-                self.logger.info(f"  ✅ 保留浮盈: ${unrealized_pnl - reinvest_amount:.2f}")
+                self.logger.info(f"  🚀 [SUCCESS] 第{new_count}次ROLL完成！（还剩{6-new_count}次机会）")
+                self.logger.info(f"  ✅ 原仓位: 继续持有，止损已保护")
+                self.logger.info(f"  ✅ 新仓位: 投入${reinvest_amount:.2f} @ {new_leverage}x杠杆")
+                self.logger.info(f"  ✅ 保留浮盈: ${net_unrealized_pnl - reinvest_amount:.2f}")
                 self.logger.info(f"  💎 复利效应: 原仓+新仓双重盈利增长！")
 
                 return {
                     'success': True,
                     'unrealized_profit': unrealized_pnl,
+                    'net_profit_after_fee': net_unrealized_pnl,
+                    'fee_amount': fee_amount,
                     'reinvest_amount': reinvest_amount,
                     'new_leverage': new_leverage,
                     'new_position_quantity': position_quantity,
-                    'roll_type': 'ADD'  # [NEW] 标记为加仓型滚仓
+                    'roll_count': new_count,
+                    'roll_type': 'ADD'
                 }
             else:
                 self.logger.error(f"  [ERROR] 新仓位加仓失败")

@@ -731,3 +731,356 @@ class AdvancedPositionManager:
         except Exception as e:
             self.logger.error(f"检查资金费率失败: {e}")
             return False, 'ERROR', 0.0
+
+    # ==================== 10. 分批止盈 (V2.0新增) ====================
+
+    def setup_scale_out_take_profits(self, symbol: str, entry_price: float,
+                                      position_amt: float, side: str,
+                                      targets: List[Dict]) -> Dict:
+        """
+        设置分批止盈挂单 (V2.0 核心功能)
+
+        在多个盈利点位设置条件止盈挂单，分批锁定利润
+
+        Args:
+            symbol: 交易对
+            entry_price: 入场价格
+            position_amt: 总仓位数量（绝对值）
+            side: 仓位方向 ('LONG' 或 'SHORT')
+            targets: 止盈目标列表，例如:
+                [
+                    {"profit_pct": 5.0, "close_pct": 50},   # 盈利5%时平50%
+                    {"profit_pct": 8.0, "close_pct": 30},   # 盈利8%时再平30%
+                    {"profit_pct": 12.0, "close_pct": 20}   # 盈利12%时全平剩余20%
+                ]
+
+        Returns:
+            {
+                'success': bool,
+                'orders': [订单ID列表],
+                'targets': [目标价格列表],
+                'error': 错误信息（如有）
+            }
+        """
+        try:
+            if not targets or len(targets) == 0:
+                return {'success': False, 'error': '未提供止盈目标'}
+
+            # 确保position_amt为正数
+            total_quantity = abs(position_amt)
+
+            # 计算订单方向（止盈是反向平仓）
+            close_side = 'SELL' if side == 'LONG' else 'BUY'
+
+            orders_created = []
+            target_prices = []
+            remaining_pct = 100.0  # 剩余仓位百分比
+
+            self.logger.info(f"\n💰 [分批止盈] 开始设置 {symbol} 止盈计划:")
+
+            for i, target in enumerate(targets, 1):
+                profit_pct = target.get('profit_pct', 0)
+                close_pct = target.get('close_pct', 0)
+
+                if profit_pct <= 0 or close_pct <= 0:
+                    self.logger.warning(f"  ⚠️  跳过无效目标: profit_pct={profit_pct}, close_pct={close_pct}")
+                    continue
+
+                # 计算目标价格
+                if side == 'LONG':
+                    target_price = entry_price * (1 + profit_pct / 100)
+                else:  # SHORT
+                    target_price = entry_price * (1 - profit_pct / 100)
+
+                # 计算平仓数量（基于剩余仓位百分比）
+                if i == len(targets):
+                    # 最后一个目标：平所有剩余仓位
+                    close_quantity = total_quantity * (remaining_pct / 100)
+                else:
+                    # 中间目标：平指定百分比
+                    close_quantity = total_quantity * (close_pct / 100)
+
+                # 确保数量精度（Binance要求至少3位小数）
+                close_quantity = round(close_quantity, 3)
+
+                if close_quantity < 0.001:
+                    self.logger.warning(f"  ⚠️  跳过数量过小的订单: {close_quantity}")
+                    continue
+
+                # 创建止盈限价单（TAKE_PROFIT_MARKET类型）
+                try:
+                    order = self.client.create_take_profit_order(
+                        symbol=symbol,
+                        side=close_side,
+                        quantity=close_quantity,
+                        stop_price=target_price,
+                        reduce_only=True
+                    )
+
+                    orders_created.append(order)
+                    target_prices.append(target_price)
+
+                    self.logger.info(
+                        f"  ✅ 目标{i}: 盈利{profit_pct}%时 @ ${target_price:.2f} "
+                        f"平仓{close_pct}% ({close_quantity:.3f}个)"
+                    )
+
+                    # 更新剩余仓位
+                    remaining_pct -= close_pct
+
+                except Exception as e:
+                    self.logger.error(f"  ❌ 创建止盈订单{i}失败: {e}")
+                    continue
+
+            if len(orders_created) == 0:
+                return {
+                    'success': False,
+                    'error': '未能创建任何止盈订单'
+                }
+
+            self.logger.info(
+                f"🎯 [分批止盈] 完成！共设置{len(orders_created)}个止盈目标\n"
+            )
+
+            return {
+                'success': True,
+                'orders': orders_created,
+                'targets': target_prices,
+                'count': len(orders_created)
+            }
+
+        except Exception as e:
+            self.logger.error(f"设置分批止盈失败: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    # ==================== 11. 追踪止损 (V2.0新增) ====================
+
+    def setup_trailing_stop(self, symbol: str, position_amt: float,
+                            side: str, callback_rate_pct: float = 1.5,
+                            activation_price: Optional[float] = None) -> Dict:
+        """
+        设置追踪止损 (Binance原生TRAILING_STOP_MARKET)
+
+        止损价格随市场有利方向自动上移，锁定利润同时保留上涨空间
+
+        Args:
+            symbol: 交易对
+            position_amt: 仓位数量（绝对值）
+            side: 仓位方向 ('LONG' 或 'SHORT')
+            callback_rate_pct: 回撤百分比触发止损（1-5%，默认1.5%）
+            activation_price: 激活价格（可选，不设置则立即激活）
+
+        Returns:
+            {
+                'success': bool,
+                'order': 订单信息,
+                'callback_rate': 回撤率,
+                'activation_price': 激活价格（如有）
+            }
+
+        示例：
+            - 做多BTC，入场$44000，当前$45000
+            - 设置追踪止损：callback_rate=2%
+            - 如果涨到$46000，止损自动跟进到$45080（回撤2%）
+            - 如果从$46000跌到$45080，触发止损
+        """
+        try:
+            # 确保回撤率在合理范围
+            if callback_rate_pct < 0.1 or callback_rate_pct > 5.0:
+                return {
+                    'success': False,
+                    'error': f'回撤率{callback_rate_pct}%超出范围（0.1-5.0%）'
+                }
+
+            # 确保position_amt为正数
+            quantity = abs(position_amt)
+
+            # 计算订单方向（止损是反向平仓）
+            close_side = 'SELL' if side == 'LONG' else 'BUY'
+
+            self.logger.info(
+                f"\n🔄 [追踪止损] 设置 {symbol}:"
+                f"\n  方向: {side} → 止损方向: {close_side}"
+                f"\n  数量: {quantity:.3f}"
+                f"\n  回撤率: {callback_rate_pct}%"
+                f"\n  激活价: {activation_price if activation_price else '立即激活'}"
+            )
+
+            # 创建追踪止损订单
+            order = self.client.create_trailing_stop_order(
+                symbol=symbol,
+                side=close_side,
+                quantity=quantity,
+                callback_rate=callback_rate_pct,
+                activation_price=activation_price,
+                reduce_only=True
+            )
+
+            self.logger.info(f"✅ [追踪止损] 设置成功！订单ID: {order.get('orderId')}\n")
+
+            return {
+                'success': True,
+                'order': order,
+                'callback_rate': callback_rate_pct,
+                'activation_price': activation_price
+            }
+
+        except Exception as e:
+            self.logger.error(f"设置追踪止损失败: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    # ==================== 12. 订单清理 (V2.0新增 - Critical!) ====================
+
+    def cancel_all_pending_orders_for_symbol(self, symbol: str) -> Dict:
+        """
+        取消指定symbol的所有未成交挂单（平仓时必须执行！）
+
+        包括：
+        - 止盈挂单
+        - 止损挂单
+        - 限价单
+        - 条件委托单
+
+        这是平仓时的关键步骤，防止遗留挂单导致意外成交
+
+        Args:
+            symbol: 交易对
+
+        Returns:
+            {
+                'success': bool,
+                'cancelled_count': 取消的订单数量,
+                'details': 详细信息
+            }
+        """
+        try:
+            self.logger.info(f"\n🧹 [订单清理] 开始清理 {symbol} 所有挂单...")
+
+            # 取消所有期货订单
+            result = self.client.cancel_all_futures_orders(symbol)
+
+            # 统计取消的订单数
+            cancelled_count = 0
+            if isinstance(result, dict):
+                # 单个订单响应
+                if result.get('orderId'):
+                    cancelled_count = 1
+            elif isinstance(result, list):
+                # 多个订单响应
+                cancelled_count = len(result)
+
+            if cancelled_count > 0:
+                self.logger.info(
+                    f"✅ [订单清理] 完成！已取消 {cancelled_count} 个挂单\n"
+                )
+            else:
+                self.logger.info(f"ℹ️  [订单清理] 无挂单需要取消\n")
+
+            return {
+                'success': True,
+                'cancelled_count': cancelled_count,
+                'details': result
+            }
+
+        except Exception as e:
+            # 如果错误是"没有挂单"，这实际上是成功的情况
+            error_str = str(e).lower()
+            if 'no such order' in error_str or 'unknown order' in error_str:
+                self.logger.info(f"ℹ️  [订单清理] 无挂单需要取消\n")
+                return {
+                    'success': True,
+                    'cancelled_count': 0,
+                    'details': 'No pending orders'
+                }
+
+            self.logger.error(f"❌ [订单清理] 失败: {e}\n")
+            return {
+                'success': False,
+                'error': str(e),
+                'cancelled_count': 0
+            }
+
+    # ==================== 13. 综合仓位管理 (V2.0新增) ====================
+
+    def setup_full_position_management(self, symbol: str, entry_price: float,
+                                       position_amt: float, side: str,
+                                       take_profit_targets: Optional[List[Dict]] = None,
+                                       trailing_stop_config: Optional[Dict] = None,
+                                       move_to_breakeven_config: Optional[Dict] = None) -> Dict:
+        """
+        一键设置完整仓位管理（止盈+止损+追踪）
+
+        Args:
+            symbol: 交易对
+            entry_price: 入场价格
+            position_amt: 仓位数量（绝对值）
+            side: 仓位方向 ('LONG' 或 'SHORT')
+            take_profit_targets: 分批止盈目标（可选）
+                例如: [{"profit_pct": 5.0, "close_pct": 50}, ...]
+            trailing_stop_config: 追踪止损配置（可选）
+                例如: {"callback_rate_pct": 2.0, "activation_price": 45000}
+            move_to_breakeven_config: 移动到盈亏平衡配置（可选）
+                例如: {"profit_trigger_pct": 5.0, "offset_pct": 0.2}
+
+        Returns:
+            {
+                'success': bool,
+                'take_profit_result': {...},
+                'trailing_stop_result': {...},
+                'breakeven_result': {...}
+            }
+        """
+        result = {
+            'success': True,
+            'take_profit_result': None,
+            'trailing_stop_result': None,
+            'breakeven_result': None
+        }
+
+        self.logger.info(
+            f"\n🎯 [完整仓位管理] 开始为 {symbol} 设置止盈止损计划"
+            f"\n  入场价: ${entry_price:.2f}"
+            f"\n  仓位: {side} {abs(position_amt):.3f}"
+        )
+
+        # 1. 设置分批止盈
+        if take_profit_targets:
+            tp_result = self.setup_scale_out_take_profits(
+                symbol, entry_price, position_amt, side, take_profit_targets
+            )
+            result['take_profit_result'] = tp_result
+            if not tp_result.get('success'):
+                self.logger.warning(f"⚠️  分批止盈设置失败")
+                result['success'] = False
+
+        # 2. 设置追踪止损
+        if trailing_stop_config:
+            ts_result = self.setup_trailing_stop(
+                symbol, position_amt, side,
+                callback_rate_pct=trailing_stop_config.get('callback_rate_pct', 1.5),
+                activation_price=trailing_stop_config.get('activation_price')
+            )
+            result['trailing_stop_result'] = ts_result
+            if not ts_result.get('success'):
+                self.logger.warning(f"⚠️  追踪止损设置失败")
+                result['success'] = False
+
+        # 3. 移动止损到盈亏平衡（如果已达到盈利条件）
+        if move_to_breakeven_config:
+            be_result = self.move_stop_to_breakeven(
+                symbol, entry_price,
+                profit_trigger_pct=move_to_breakeven_config.get('profit_trigger_pct', 5.0),
+                breakeven_offset_pct=move_to_breakeven_config.get('offset_pct', 0.2)
+            )
+            result['breakeven_result'] = be_result
+            # move_to_breakeven 失败不影响整体成功（可能只是盈利未达标）
+
+        self.logger.info(f"{'✅' if result['success'] else '⚠️'} [完整仓位管理] 设置完成\n")
+
+        return result
